@@ -1,49 +1,5 @@
 'use client';
 
-<<<<<<< HEAD
-import { DollarSign, CheckCircle, XCircle, Clock } from 'lucide-react';
-
-export default function PaymentHistoryPage() {
-  // Mock data - Replace with actual API call
-  const payments = [
-    {
-      id: 1,
-      organization: 'Acme Corporation',
-      amount: 99.00,
-      status: 'Completed',
-      date: '2024-01-15',
-      transactionId: 'TXN-123456',
-      plan: 'Premium',
-    },
-    {
-      id: 2,
-      organization: 'Tech Solutions Inc',
-      amount: 49.00,
-      status: 'Completed',
-      date: '2024-02-01',
-      transactionId: 'TXN-123457',
-      plan: 'Standard',
-    },
-    {
-      id: 3,
-      organization: 'Creative Studio',
-      amount: 99.00,
-      status: 'Pending',
-      date: '2024-03-10',
-      transactionId: 'TXN-123458',
-      plan: 'Premium',
-    },
-    {
-      id: 4,
-      organization: 'Acme Corporation',
-      amount: 99.00,
-      status: 'Failed',
-      date: '2024-01-01',
-      transactionId: 'TXN-123459',
-      plan: 'Premium',
-    },
-  ];
-=======
 import { useState, useEffect } from 'react';
 import { DollarSign, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
 import { paymentAPI } from '@/lib/api';
@@ -90,7 +46,6 @@ export default function PaymentHistoryPage() {
       setLoading(false);
     }
   };
->>>>>>> feature-admin
 
   const getStatusIcon = (status) => {
     switch (status) {
@@ -122,8 +77,6 @@ export default function PaymentHistoryPage() {
     .filter((p) => p.status === 'Completed')
     .reduce((sum, p) => sum + p.amount, 0);
 
-<<<<<<< HEAD
-=======
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -135,7 +88,6 @@ export default function PaymentHistoryPage() {
     );
   }
 
->>>>>>> feature-admin
   return (
     <>
       <div className="space-y-6">
@@ -154,79 +106,13 @@ export default function PaymentHistoryPage() {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Total Revenue</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-<<<<<<< HEAD
-                  ${totalRevenue.toFixed(2)}
-=======
                   ₹{totalRevenue.toFixed(2)}
->>>>>>> feature-admin
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-<<<<<<< HEAD
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-800">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Organization
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Plan
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Amount
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Transaction ID
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
-                {payments.map((payment) => (
-                  <tr key={payment.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {payment.date}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                      {payment.organization}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                      {payment.plan}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-white">
-                      ${payment.amount.toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        {getStatusIcon(payment.status)}
-                        <span
-                          className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
-                            payment.status
-                          )}`}
-                        >
-                          {payment.status}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400 font-mono">
-                      {payment.transactionId}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-=======
         {error && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
             <p className="text-red-800 dark:text-red-300">{error}</p>
@@ -305,13 +191,8 @@ export default function PaymentHistoryPage() {
               <p className="text-gray-500 dark:text-gray-400">No payment transactions found</p>
             </div>
           )}
->>>>>>> feature-admin
         </div>
       </div>
     </>
   );
 }
-<<<<<<< HEAD
-
-=======
->>>>>>> feature-admin

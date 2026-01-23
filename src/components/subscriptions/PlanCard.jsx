@@ -23,8 +23,6 @@ export function PlanCard({ plan, isActive = false, isPopular = false }) {
     return 'from-purple-500 to-pink-500';
   };
 
-<<<<<<< HEAD
-=======
   const handleEdit = (plan) => {
     setEditingPlan(plan);
     setFormData({
@@ -43,7 +41,6 @@ export function PlanCard({ plan, isActive = false, isPopular = false }) {
     setShowModal(true);
   };
 
->>>>>>> feature-admin
   return (
     <div
       className={`relative rounded-2xl border-2 p-8 transition-all duration-300 transform hover:scale-105 ${
@@ -92,14 +89,6 @@ export function PlanCard({ plan, isActive = false, isPopular = false }) {
       <div className="mb-6">
         <div className="flex items-baseline gap-2 mb-2">
           <span className="text-4xl font-bold text-gray-900 dark:text-white">
-<<<<<<< HEAD
-            ${plan.price}
-          </span>
-          <span className="text-gray-500 dark:text-gray-400">/{plan.billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
-        </div>
-        {plan.originalPrice && plan.originalPrice > plan.price && (
-          <p className="text-sm text-gray-500 line-through">${plan.originalPrice}/{plan.billingCycle === 'monthly' ? 'mo' : 'yr'}</p>
-=======
             {(plan.currency === 'INR' ? '₹' : '$')}{plan.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
           <span className="text-gray-500 dark:text-gray-400">/{plan.billingCycle === 'monthly' || plan.billing_cycle === 'monthly' ? 'mo' : 'yr'}</span>
@@ -108,7 +97,6 @@ export function PlanCard({ plan, isActive = false, isPopular = false }) {
           <p className="text-sm text-gray-500 line-through">
             {(plan.currency === 'INR' ? '₹' : '$')}{(plan.originalPrice || plan.original_price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/{plan.billingCycle === 'monthly' || plan.billing_cycle === 'monthly' ? 'mo' : 'yr'}
           </p>
->>>>>>> feature-admin
         )}
       </div>
 
@@ -131,8 +119,6 @@ export function PlanCard({ plan, isActive = false, isPopular = false }) {
             AI Features: {plan.ai_features_enabled ? 'Enabled' : 'Disabled'}
           </span>
         </div>
-<<<<<<< HEAD
-=======
         {/* Display custom settings dynamically */}
         {plan.custom_settings && typeof plan.custom_settings === 'object' && Object.keys(plan.custom_settings).length > 0 && (
           Object.entries(plan.custom_settings).map(([key, value]) => (
@@ -144,7 +130,6 @@ export function PlanCard({ plan, isActive = false, isPopular = false }) {
             </div>
           ))
         )}
->>>>>>> feature-admin
       </div>
 
       {plan.features && plan.features.length > 0 && (
@@ -162,20 +147,14 @@ export function PlanCard({ plan, isActive = false, isPopular = false }) {
 
       {isActive && (
         <button
-<<<<<<< HEAD
-=======
            onClick={() => handleEdit(plan)}
 
->>>>>>> feature-admin
           className={`w-full py-3 rounded-lg font-semibold transition-all ${
             isPopular
               ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white hover:from-yellow-600 hover:to-orange-600 shadow-lg hover:shadow-xl'
               : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700'
           }`}
-<<<<<<< HEAD
-=======
           title="Edit Plan"
->>>>>>> feature-admin
         >
           Manage Plan
         </button>
