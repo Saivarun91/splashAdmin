@@ -76,8 +76,18 @@ export const authAPI = {
  */
 export const dashboardAPI = {
   getStats: () => apiRequest('/api/admin/dashboard/stats'),
+<<<<<<< HEAD
   getImageGenerationData: (timeRange = 'day') =>
     apiRequest(`/api/admin/dashboard/images?range=${timeRange}`),
+=======
+  getImageGenerationData: (timeRange = 'day', startDate = null, endDate = null) => {
+    let url = `/api/admin/dashboard/images?range=${timeRange}`;
+    if (startDate && endDate) {
+      url += `&start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`;
+    }
+    return apiRequest(url);
+  },
+>>>>>>> feature-admin
   getAllCharts: () => apiRequest('/api/admin/dashboard/all-charts'),
 };
 
@@ -145,9 +155,19 @@ export const subscriptionAPI = {
  * Note: Payment endpoints may need to be created in the backend
  */
 export const paymentAPI = {
+<<<<<<< HEAD
   getAll: () => apiRequest('/probackendapp/api/admin/payments'),
   getById: (id) => apiRequest(`/probackendapp/api/admin/payments/${id}`),
   getRevenue: () => apiRequest('/probackendapp/api/admin/payments/revenue'),
+=======
+  getAll: (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return apiRequest(`/api/payments/admin/all/?${queryString}`);
+  },
+  getById: (id) => apiRequest(`/probackendapp/api/admin/payments/${id}`),
+  getRevenue: () => apiRequest('/api/payments/admin/revenue/'),
+  getHistory: (organizationId) => apiRequest(`/api/payments/history/?organization_id=${organizationId}`),
+>>>>>>> feature-admin
 };
 
 /**
@@ -165,6 +185,17 @@ export const creditsAPI = {
   },
   getOrganizationSummary: (orgId) => 
     apiRequest(`/api/credits/organization/${orgId}/summary/`),
+<<<<<<< HEAD
+=======
+  getUsageStatistics: (timeRange = 'month', periodCount = 6) => {
+    return apiRequest(`/api/credits/admin/usage-statistics/?time_range=${timeRange}&period_count=${periodCount}`);
+  },
+  getSettings: () => apiRequest('/api/credits/admin/settings/'),
+  updateSettings: (data) => apiRequest('/api/credits/admin/settings/update/', {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
+>>>>>>> feature-admin
 };
 
 /**

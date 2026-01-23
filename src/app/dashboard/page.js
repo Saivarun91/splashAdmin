@@ -15,8 +15,8 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { Building2, Image as ImageIcon, TrendingUp, Users, Activity, Zap, DollarSign, BarChart3 } from 'lucide-react';
-import { dashboardAPI } from '@/lib/api';
+import { Building2, Image as ImageIcon, TrendingUp, Users, Activity, Zap, DollarSign, BarChart3, Calendar, X } from 'lucide-react';
+import { dashboardAPI, organizationAPI } from '@/lib/api';
 // import { useEffect } from 'react';
 
 // All data is now fetched dynamically from the backend
@@ -33,81 +33,119 @@ export default function Dashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [chartData, setChartData] = useState([]);
-  const [weeklyData, setWeeklyData] = useState([]);
-  const [monthlyData, setMonthlyData] = useState([]);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [organizations, setOrganizations] = useState([]);
+  const [customDateRange, setCustomDateRange] = useState({
+    start_date: '',
+    end_date: ''
+  });
+  const [useCustomDates, setUseCustomDates] = useState(false);
+  const [chartLoading, setChartLoading] = useState(false);
 
-  // Fetch dashboard stats on component mount
+  // Fetch dashboard stats and organizations on component mount
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchData = async () => {
       setLoading(true);
       try {
-        const statsResponse = await dashboardAPI.getStats();
+        // Fetch stats and organizations in parallel
+        const [statsResponse, organizationsResponse] = await Promise.all([
+          dashboardAPI.getStats(),
+          organizationAPI.getAll()
+        ]);
+
+        // Set organizations
+        if (organizationsResponse && organizationsResponse.organizations) {
+          setOrganizations(organizationsResponse.organizations);
+          // Debug log to verify data structure
+          if (organizationsResponse.organizations.length > 0) {
+            console.log('Sample organization:', organizationsResponse.organizations[0]);
+            console.log('Total organizations:', organizationsResponse.organizations.length);
+          }
+        } else {
+          console.warn('No organizations found in response:', organizationsResponse);
+        }
+
+        // Set stats
         if (statsResponse.success && statsResponse.stats) {
           setStats({
             totalOrganizations: statsResponse.stats.totalOrganizations || 0,
             totalImages: statsResponse.stats.totalImages || 0,
-            totalUsers: statsResponse.stats.totalUsers || 0,
+            totalUsers: statsResponse.stats.totalUsers || 0, // Will be overridden by calculated value
             growthRate: statsResponse.stats.growthRate || 0,
             totalCredits: statsResponse.stats.totalCredits || 0,
             activeSubscriptions: statsResponse.stats.activeSubscriptions || 0,
           });
         }
       } catch (error) {
-        console.error('Failed to fetch stats:', error);
+        console.error('Failed to fetch data:', error);
       } finally {
         setLoading(false);
         setIsInitialLoad(false);
       }
     };
-    fetchStats();
+    fetchData();
   }, []);
 
-  // Fetch chart data when component mounts and when timeRange changes
+  // Fetch initial chart data when component mounts (only for default timeRange)
   useEffect(() => {
-    const fetchChartData = async () => {
+    const fetchInitialChartData = async () => {
       try {
-        // Fetch all three chart types in parallel
-        const [dailyResponse, weeklyResponse, monthlyResponse] = await Promise.all([
-          dashboardAPI.getImageGenerationData('day'),
-          dashboardAPI.getImageGenerationData('week'),
-          dashboardAPI.getImageGenerationData('month')
-        ]);
-
-        if (dailyResponse.success && dailyResponse.data) {
-          setChartData(dailyResponse.data);
-        }
-        if (weeklyResponse.success && weeklyResponse.data) {
-          setWeeklyData(weeklyResponse.data);
-        }
-        if (monthlyResponse.success && monthlyResponse.data) {
-          setMonthlyData(monthlyResponse.data);
+        // Only fetch data for the default timeRange (day) to avoid loading all three
+        const response = await dashboardAPI.getImageGenerationData('day');
+        if (response.success && response.data) {
+          const normalized = response.data.map(item => ({
+            ...item,
+            value: item.count !== undefined ? item.count : (item.images !== undefined ? item.images : 0)
+          }));
+          setChartData(normalized);
         }
       } catch (error) {
-        console.error('Failed to fetch chart data:', error);
+        console.error('Failed to fetch initial chart data:', error);
       }
     };
-    fetchChartData();
+    fetchInitialChartData();
   }, []); // Only run once on mount
 
-  // Update main chart when timeRange changes
+  // Update main chart when timeRange or custom dates change
   useEffect(() => {
     if (isInitialLoad) {
       return; // Skip on initial load
     }
 
     const fetchChartData = async () => {
+      setChartLoading(true);
       try {
-        const data = await dashboardAPI.getImageGenerationData(timeRange);
-        if (data.success && data.data && data.data.length > 0) {
-          setChartData(data.data);
+        const startDate = useCustomDates && customDateRange.start_date 
+          ? `${customDateRange.start_date}T00:00:00Z` 
+          : null;
+        const endDate = useCustomDates && customDateRange.end_date 
+          ? `${customDateRange.end_date}T23:59:59Z` 
+          : null;
+
+        const data = await dashboardAPI.getImageGenerationData(timeRange, startDate, endDate);
+        if (data.success && data.data) {
+          // Normalize data to have consistent structure
+          const normalizedData = data.data.map(item => ({
+            ...item,
+            value: item.count !== undefined ? item.count : (item.images !== undefined ? item.images : 0),
+            // Keep original keys for X-axis
+            date: item.date,
+            week: item.week,
+            month: item.month
+          }));
+          setChartData(normalizedData);
+        } else {
+          setChartData([]);
         }
       } catch (error) {
         console.error('Failed to fetch chart data:', error);
+        setChartData([]);
+      } finally {
+        setChartLoading(false);
       }
     };
     fetchChartData();
-  }, [timeRange, isInitialLoad]);
+  }, [timeRange, useCustomDates, customDateRange.start_date, customDateRange.end_date, isInitialLoad]);
 
   const getChartData = () => {
     // Return empty array if no data to prevent chart errors
@@ -117,12 +155,21 @@ export default function Dashboard() {
     return chartData;
   };
 
-  const getWeeklyData = () => {
-    return weeklyData && weeklyData.length > 0 ? weeklyData : [];
-  };
 
-  const getMonthlyData = () => {
-    return monthlyData && monthlyData.length > 0 ? monthlyData : [];
+  // Calculate total users from organizations
+  const calculateTotalUsers = () => {
+    if (!organizations || organizations.length === 0) {
+      return 0;
+    }
+    
+    const total = organizations.reduce((sum, org) => {
+      // API returns member_count field (see backend/organization/views.py line 302)
+      // The backend calculates: 'member_count': len(org.members) if org.members else 0
+      const memberCount = org.member_count !== undefined && org.member_count !== null ? Number(org.member_count) : 0;
+      return sum + memberCount;
+    }, 0);
+    
+    return total;
   };
 
   const getXAxisKey = () => {
@@ -140,6 +187,11 @@ export default function Dashboard() {
 
   const getYAxisLabel = () => {
     return timeRange === 'day' ? 'Images Generated' : 'Total Images';
+  };
+
+  const getDataKey = () => {
+    // Use normalized 'value' key
+    return 'value';
   };
 
   if (loading) {
@@ -173,7 +225,7 @@ export default function Dashboard() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-3">
           <StatCard
             title="Organizations"
             value={stats.totalOrganizations}
@@ -192,20 +244,20 @@ export default function Dashboard() {
           />
           <StatCard
             title="Total Users"
-            value={stats.totalUsers}
+            value={calculateTotalUsers()}
             icon={Users}
             trend={stats.growthRate}
             gradient="from-green-500 to-green-600"
             bgGradient="from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20"
           />
-          <StatCard
+          {/* <StatCard
             title="Growth Rate"
             value={`${stats.growthRate}%`}
             icon={TrendingUp}
             trend={stats.growthRate}
             gradient="from-orange-500 to-orange-600"
             bgGradient="from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20"
-          />
+          /> */}
           <StatCard
             title="Total Credits"
             value={stats.totalCredits.toLocaleString()}
@@ -235,90 +287,147 @@ export default function Dashboard() {
                 Track image generation trends over time
               </p>
             </div>
-            <div className="flex gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
-              <button
-                onClick={() => setTimeRange('day')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${timeRange === 'day'
-                  ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+            <div className="flex flex-col sm:flex-row gap-4">
+              {/* Custom Date Range */}
+              <div className="flex items-center gap-3 bg-gray-50 dark:bg-gray-800 rounded-lg p-2">
+                <button
+                  onClick={() => setUseCustomDates(!useCustomDates)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all ${
+                    useCustomDates
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                   }`}
-              >
-                Daily
-              </button>
-              <button
-                onClick={() => setTimeRange('week')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${timeRange === 'week'
-                  ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                  }`}
-              >
-                Weekly
-              </button>
-              <button
-                onClick={() => setTimeRange('month')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${timeRange === 'month'
-                  ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                  }`}
-              >
-                Monthly
-              </button>
+                >
+                  <Calendar size={16} />
+                  Custom Dates
+                </button>
+                {useCustomDates && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={customDateRange.start_date}
+                      onChange={(e) => setCustomDateRange({ ...customDateRange, start_date: e.target.value })}
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <span className="text-gray-500 dark:text-gray-400">to</span>
+                    <input
+                      type="date"
+                      value={customDateRange.end_date}
+                      onChange={(e) => setCustomDateRange({ ...customDateRange, end_date: e.target.value })}
+                      min={customDateRange.start_date}
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <button
+                      onClick={() => {
+                        setUseCustomDates(false);
+                        setCustomDateRange({ start_date: '', end_date: '' });
+                      }}
+                      className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors"
+                      title="Clear custom dates"
+                    >
+                      <X size={16} className="text-gray-500 dark:text-gray-400" />
+                    </button>
+                  </div>
+                )}
+              </div>
+              
+              {/* Time Range Buttons */}
+              {!useCustomDates && (
+                <div className="flex gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+                  <button
+                    onClick={() => setTimeRange('day')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${timeRange === 'day'
+                      ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                      }`}
+                  >
+                    Daily
+                  </button>
+                  <button
+                    onClick={() => setTimeRange('week')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${timeRange === 'week'
+                      ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                      }`}
+                  >
+                    Weekly
+                  </button>
+                  <button
+                    onClick={() => setTimeRange('month')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${timeRange === 'month'
+                      ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                      }`}
+                  >
+                    Monthly
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
-          <ResponsiveContainer width="100%" height={400}>
-            {getChartData().length > 0 ? (
-              <AreaChart data={getChartData()}>
-              <defs>
-                <linearGradient id="colorImages" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-800" />
-              <XAxis
-                dataKey={getXAxisKey()}
-                className="text-gray-600 dark:text-gray-400"
-                tick={{ fill: 'currentColor', fontSize: 12 }}
-                stroke="currentColor"
-              />
-              <YAxis
-                label={{ value: getYAxisLabel(), angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' } }}
-                className="text-gray-600 dark:text-gray-400"
-                tick={{ fill: 'currentColor', fontSize: 12 }}
-                stroke="currentColor"
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                }}
-                className="dark:bg-gray-800 dark:border-gray-700"
-              />
-              <Legend />
-              {getChartData().length > 0 && (
-                <Area
-                  type="monotone"
-                  dataKey={timeRange === 'day' ? 'count' : 'images'}
-                  stroke="#3b82f6"
-                  strokeWidth={3}
-                  fill="url(#colorImages)"
-                  name="Images Generated"
-                />
-              )}
-            </AreaChart>
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-gray-500 dark:text-gray-400">No data available</p>
+          {chartLoading ? (
+            <div className="flex items-center justify-center h-[400px]">
+              <div className="flex flex-col items-center gap-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="text-gray-500 dark:text-gray-400 text-sm">Loading chart data...</div>
               </div>
-            )}
-          </ResponsiveContainer>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={400}>
+              {getChartData().length > 0 ? (
+                <AreaChart data={getChartData()}>
+                  <defs>
+                    <linearGradient id="colorImages" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-800" />
+                  <XAxis
+                    dataKey={getXAxisKey()}
+                    className="text-gray-600 dark:text-gray-400"
+                    tick={{ fill: 'currentColor', fontSize: 12 }}
+                    stroke="currentColor"
+                  />
+                  <YAxis
+                    label={{ value: getYAxisLabel(), angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' } }}
+                    className="text-gray-600 dark:text-gray-400"
+                    tick={{ fill: 'currentColor', fontSize: 12 }}
+                    stroke="currentColor"
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                    }}
+                    className="dark:bg-gray-800 dark:border-gray-700"
+                  />
+                  <Legend />
+                  {getChartData().length > 0 && (
+                    <Area
+                      type="monotone"
+                      dataKey={getDataKey()}
+                      stroke="#3b82f6"
+                      strokeWidth={3}
+                      fill="url(#colorImages)"
+                      name="Images Generated"
+                    />
+                  )}
+                </AreaChart>
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-gray-500 dark:text-gray-400">No data available for the selected period</p>
+                </div>
+              )}
+            </ResponsiveContainer>
+          )}
         </div>
 
         {/* Additional Analytics */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 p-6 hover:shadow-xl transition-shadow duration-300">
             <div className="flex items-center gap-3 mb-6">
               <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
@@ -412,7 +521,7 @@ export default function Dashboard() {
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </div> */}
       </div>
     </>
   );

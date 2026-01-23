@@ -9,7 +9,9 @@ import { ProjectDetailView } from '@/components/organization/ProjectDetailView';
 import { IndividualImagesView } from '@/components/organization/image-analysis/IndividualImagesView';
 import { OrganizationUsers } from '@/components/organization/OrganizationUsers';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { organizationAPI } from '@/lib/api';
+import { organizationAPI, subscriptionAPI, paymentAPI } from '@/lib/api';
+import { PlanCard } from '@/components/subscriptions/PlanCard';
+import { CreditCard, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
 
 export default function OrganizationDetailPage() {
   const params = useParams();
@@ -20,6 +22,11 @@ export default function OrganizationDetailPage() {
   const [showProjectDetail, setShowProjectDetail] = useState(false);
   const [activeMainTab, setActiveMainTab] = useState('projects');
   const [loading, setLoading] = useState(true);
+  const [plans, setPlans] = useState([]);
+  const [currentPlan, setCurrentPlan] = useState(null);
+  const [plansLoading, setPlansLoading] = useState(false);
+  const [payments, setPayments] = useState([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
 
   useEffect(() => {
     const fetchOrganizationData = async () => {
@@ -54,6 +61,21 @@ export default function OrganizationDetailPage() {
         };
 
         setOrganization(transformedOrg);
+        
+        // Fetch current plan if organization has one
+        if (orgData.plan) {
+          const planId = typeof orgData.plan === 'object' ? orgData.plan.id : orgData.plan;
+          try {
+            const planResponse = await subscriptionAPI.getById(planId);
+            if (planResponse.success && planResponse.plan) {
+              setCurrentPlan(planResponse.plan);
+            }
+          } catch (error) {
+            console.error('Failed to fetch current plan:', error);
+          }
+        } else {
+          setCurrentPlan(null);
+        }
       } catch (error) {
         console.error('Failed to fetch organization:', error);
         setOrganization(null);
@@ -62,10 +84,98 @@ export default function OrganizationDetailPage() {
       }
     };
 
+    const fetchPlans = async () => {
+      setPlansLoading(true);
+      try {
+        const response = await subscriptionAPI.getAll();
+        if (response.success && response.plans) {
+          setPlans(response.plans);
+        }
+      } catch (error) {
+        console.error('Failed to fetch plans:', error);
+      } finally {
+        setPlansLoading(false);
+      }
+    };
+
+    const fetchPayments = async () => {
+      setPaymentsLoading(true);
+      try {
+        const response = await paymentAPI.getAll({ organization_id: params.id });
+        if (response.success && response.transactions) {
+          setPayments(response.transactions);
+        }
+      } catch (error) {
+        console.error('Failed to fetch payments:', error);
+      } finally {
+        setPaymentsLoading(false);
+      }
+    };
+
     if (params.id) {
       fetchOrganizationData();
+      fetchPlans();
+      fetchPayments();
     }
   }, [params.id]);
+
+  // Refresh data when switching to payments or plans tab
+  useEffect(() => {
+    if (!params.id) return;
+    
+    if (activeMainTab === 'payments') {
+      // Refresh payments when switching to payments tab
+      const fetchPayments = async () => {
+        setPaymentsLoading(true);
+        try {
+          const response = await paymentAPI.getAll({ organization_id: params.id });
+          if (response.success && response.transactions) {
+            setPayments(response.transactions);
+          }
+        } catch (error) {
+          console.error('Failed to fetch payments:', error);
+        } finally {
+          setPaymentsLoading(false);
+        }
+      };
+      fetchPayments();
+    } else if (activeMainTab === 'plans') {
+      // Refresh plans and current plan when switching to plans tab
+      const refreshPlans = async () => {
+        setPlansLoading(true);
+        try {
+          const [plansResponse, orgData] = await Promise.all([
+            subscriptionAPI.getAll(),
+            organizationAPI.getById(params.id)
+          ]);
+          
+          if (plansResponse.success && plansResponse.plans) {
+            setPlans(plansResponse.plans);
+          }
+          
+          // Refresh current plan
+          if (orgData.plan) {
+            const planId = typeof orgData.plan === 'object' ? orgData.plan.id : orgData.plan;
+            try {
+              const planResponse = await subscriptionAPI.getById(planId);
+              if (planResponse.success && planResponse.plan) {
+                setCurrentPlan(planResponse.plan);
+              }
+            } catch (error) {
+              console.error('Failed to fetch current plan:', error);
+            }
+          } else {
+            setCurrentPlan(null);
+          }
+        } catch (error) {
+          console.error('Failed to refresh plans:', error);
+        } finally {
+          setPlansLoading(false);
+        }
+      };
+      refreshPlans();
+    }
+  }, [activeMainTab, params.id]);
 
   useEffect(() => {
     if (selectedProject) {
@@ -362,6 +472,24 @@ export default function OrganizationDetailPage() {
               >
                 Image Analysis
               </TabsTrigger>
+              <TabsTrigger
+                value="plans"
+                className="rounded-t-lg border-b-2 border-transparent px-6 py-4 text-sm font-semibold data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-900 data-[state=active]:shadow-sm transition-all"
+              >
+                <CreditCard size={18} className="mr-2" />
+                Plans & Subscription
+              </TabsTrigger>
+              <TabsTrigger
+                value="payments"
+                className="rounded-t-lg border-b-2 border-transparent px-6 py-4 text-sm font-semibold data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-900 data-[state=active]:shadow-sm transition-all"
+              >
+                Payments
+                {payments.length > 0 && (
+                  <span className="ml-2 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium">
+                    {payments.length}
+                  </span>
+                )}
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -405,6 +533,189 @@ export default function OrganizationDetailPage() {
               <p className="text-gray-600 dark:text-gray-400">Analyze and review generated images across all projects</p>
             </div>
             <IndividualImagesView />
+          </TabsContent>
+
+          <TabsContent value="plans" className="m-0 p-8">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Plans & Subscription</h2>
+              <p className="text-gray-600 dark:text-gray-400">View and manage organization subscription plans</p>
+            </div>
+            
+            {currentPlan && (
+              <div className="mb-8">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Current Plan</h3>
+                <div className="max-w-md">
+                  <PlanCard 
+                    plan={{
+                      id: currentPlan.id,
+                      name: currentPlan.name,
+                      description: currentPlan.description,
+                      price: currentPlan.price,
+                      originalPrice: currentPlan.original_price,
+                      currency: currentPlan.currency || 'USD',
+                      billingCycle: currentPlan.billing_cycle,
+                      credits_per_month: currentPlan.credits_per_month,
+                      max_projects: currentPlan.max_projects,
+                      ai_features_enabled: currentPlan.ai_features_enabled,
+                      features: currentPlan.features || [],
+                      isActive: currentPlan.is_active,
+                      isPopular: currentPlan.is_popular,
+                    }}
+                    isActive={true}
+                    isPopular={currentPlan.is_popular}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Available Plans</h3>
+              {plansLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : plans.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {plans.map((plan) => {
+                    const isCurrentPlan = currentPlan && currentPlan.id === plan.id;
+                    return (
+                      <PlanCard
+                        key={plan.id}
+                        plan={{
+                          id: plan.id,
+                          name: plan.name,
+                          description: plan.description,
+                          price: plan.price,
+                          originalPrice: plan.original_price,
+                          currency: plan.currency || 'USD',
+                          billingCycle: plan.billing_cycle,
+                          credits_per_month: plan.credits_per_month,
+                          max_projects: plan.max_projects,
+                          ai_features_enabled: plan.ai_features_enabled,
+                          features: plan.features || [],
+                          isActive: plan.is_active,
+                          isPopular: plan.is_popular,
+                        }}
+                        isActive={plan.is_active}
+                        isPopular={plan.is_popular && !isCurrentPlan}
+                      />
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+                  <p className="text-gray-500 dark:text-gray-400">No plans available</p>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="payments" className="m-0 p-8">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Payment History</h2>
+              <p className="text-gray-600 dark:text-gray-400">View all payment transactions for this organization</p>
+            </div>
+            
+            {paymentsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+              </div>
+            ) : payments.length > 0 ? (
+              <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 dark:bg-gray-800">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Date
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Plan
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Amount
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Credits
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Transaction ID
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+                      {payments.map((payment) => {
+                        const getStatusIcon = (status) => {
+                          switch (status) {
+                            case 'completed':
+                              return <CheckCircle className="text-green-500" size={18} />;
+                            case 'pending':
+                              return <Clock className="text-yellow-500" size={18} />;
+                            case 'failed':
+                              return <XCircle className="text-red-500" size={18} />;
+                            default:
+                              return null;
+                          }
+                        };
+
+                        const getStatusColor = (status) => {
+                          switch (status) {
+                            case 'completed':
+                              return 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300';
+                            case 'pending':
+                              return 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-300';
+                            case 'failed':
+                              return 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300';
+                            default:
+                              return '';
+                          }
+                        };
+
+                        const status = payment.status || 'pending';
+                        const statusDisplay = status.charAt(0).toUpperCase() + status.slice(1);
+                        
+                        return (
+                          <tr key={payment.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                              {payment.created_at ? new Date(payment.created_at).toLocaleDateString() : 'N/A'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                              {payment.plan_name || 'Credit Purchase'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-white">
+                              ₹{payment.amount.toFixed(2)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                              {payment.credits.toLocaleString()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                {getStatusIcon(status)}
+                                <span
+                                  className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(status)}`}
+                                >
+                                  {statusDisplay}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400 font-mono">
+                              {payment.razorpay_order_id || payment.razorpay_payment_id || 'N/A'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+                <p className="text-gray-500 dark:text-gray-400">No payment transactions found for this organization</p>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>
