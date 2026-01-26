@@ -76,8 +76,13 @@ export const authAPI = {
  */
 export const dashboardAPI = {
   getStats: () => apiRequest('/api/admin/dashboard/stats'),
-  getImageGenerationData: (timeRange = 'day') =>
-    apiRequest(`/api/admin/dashboard/images?range=${timeRange}`),
+  getImageGenerationData: (timeRange = 'day', startDate = null, endDate = null) => {
+    let url = `/api/admin/dashboard/images?range=${timeRange}`;
+    if (startDate && endDate) {
+      url += `&start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`;
+    }
+    return apiRequest(url);
+  },
   getAllCharts: () => apiRequest('/api/admin/dashboard/all-charts'),
 };
 
@@ -145,9 +150,45 @@ export const subscriptionAPI = {
  * Note: Payment endpoints may need to be created in the backend
  */
 export const paymentAPI = {
-  getAll: () => apiRequest('/probackendapp/api/admin/payments'),
+  getAll: (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return apiRequest(`/api/payments/admin/all/?${queryString}`);
+  },
   getById: (id) => apiRequest(`/probackendapp/api/admin/payments/${id}`),
-  getRevenue: () => apiRequest('/probackendapp/api/admin/payments/revenue'),
+  getRevenue: () => apiRequest('/api/payments/admin/revenue/'),
+  getHistory: (organizationId) => apiRequest(`/api/payments/history/?organization_id=${organizationId}`),
+};
+
+/**
+ * Invoice API functions
+ */
+export const invoiceAPI = {
+  getInvoice: (transactionId) =>
+    apiRequest(`/api/invoices/${transactionId}/`),
+  getConfig: () =>
+    apiRequest(`/api/invoices/config/`),
+  updateConfig: (config) => apiRequest('/api/invoices/config/', {
+    method: 'PUT',
+    body: JSON.stringify(config),
+  }),
+  downloadInvoice: (transactionId) => {
+    const url = `${API_BASE_URL}/api/invoices/${transactionId}/download/`;
+    const token = typeof window !== "undefined" ? (localStorage.getItem("auth_token") || localStorage.getItem("token")) : null;
+    
+    return fetch(url, {
+      headers: {
+        Authorization: token ? `Bearer ${token}` : "",
+      },
+    }).then((response) => {
+      if (!response.ok) throw new Error("Failed to download invoice");
+      return response.blob();
+    });
+  },
+  getTemplate: () => apiRequest('/api/invoices/template/'),
+  updateTemplate: (template) => apiRequest('/api/invoices/template/', {
+    method: 'PUT',
+    body: JSON.stringify({ template }),
+  }),
 };
 
 /**
@@ -165,6 +206,14 @@ export const creditsAPI = {
   },
   getOrganizationSummary: (orgId) => 
     apiRequest(`/api/credits/organization/${orgId}/summary/`),
+  getUsageStatistics: (timeRange = 'month', periodCount = 6) => {
+    return apiRequest(`/api/credits/admin/usage-statistics/?time_range=${timeRange}&period_count=${periodCount}`);
+  },
+  getSettings: () => apiRequest('/api/credits/admin/settings/'),
+  updateSettings: (data) => apiRequest('/api/credits/admin/settings/update/', {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
 };
 
 /**

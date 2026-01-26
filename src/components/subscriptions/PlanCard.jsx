@@ -23,6 +23,24 @@ export function PlanCard({ plan, isActive = false, isPopular = false }) {
     return 'from-purple-500 to-pink-500';
   };
 
+  const handleEdit = (plan) => {
+    setEditingPlan(plan);
+    setFormData({
+      name: plan.name || '',
+      description: plan.description || '',
+      price: plan.price || '',
+      original_price: plan.original_price || '',
+      billing_cycle: plan.billing_cycle || 'monthly',
+      credits_per_month: plan.credits_per_month || 1000,
+      max_projects: plan.max_projects || 10,
+      ai_features_enabled: plan.ai_features_enabled !== undefined ? plan.ai_features_enabled : true,
+      features: plan.features && plan.features.length > 0 ? plan.features : [''],
+      is_active: plan.is_active !== undefined ? plan.is_active : true,
+      is_popular: plan.is_popular || false,
+    });
+    setShowModal(true);
+  };
+
   return (
     <div
       className={`relative rounded-2xl border-2 p-8 transition-all duration-300 transform hover:scale-105 ${
@@ -71,12 +89,14 @@ export function PlanCard({ plan, isActive = false, isPopular = false }) {
       <div className="mb-6">
         <div className="flex items-baseline gap-2 mb-2">
           <span className="text-4xl font-bold text-gray-900 dark:text-white">
-            ${plan.price}
+            {(plan.currency === 'INR' ? '₹' : '$')}{plan.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
-          <span className="text-gray-500 dark:text-gray-400">/{plan.billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
+          <span className="text-gray-500 dark:text-gray-400">/{plan.billingCycle === 'monthly' || plan.billing_cycle === 'monthly' ? 'mo' : 'yr'}</span>
         </div>
-        {plan.originalPrice && plan.originalPrice > plan.price && (
-          <p className="text-sm text-gray-500 line-through">${plan.originalPrice}/{plan.billingCycle === 'monthly' ? 'mo' : 'yr'}</p>
+        {(plan.originalPrice || plan.original_price) && (plan.originalPrice || plan.original_price) > plan.price && (
+          <p className="text-sm text-gray-500 line-through">
+            {(plan.currency === 'INR' ? '₹' : '$')}{(plan.originalPrice || plan.original_price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/{plan.billingCycle === 'monthly' || plan.billing_cycle === 'monthly' ? 'mo' : 'yr'}
+          </p>
         )}
       </div>
 
@@ -99,6 +119,17 @@ export function PlanCard({ plan, isActive = false, isPopular = false }) {
             AI Features: {plan.ai_features_enabled ? 'Enabled' : 'Disabled'}
           </span>
         </div>
+        {/* Display custom settings dynamically */}
+        {plan.custom_settings && typeof plan.custom_settings === 'object' && Object.keys(plan.custom_settings).length > 0 && (
+          Object.entries(plan.custom_settings).map(([key, value]) => (
+            <div key={key} className="flex items-center gap-3">
+              <Zap className={`text-blue-500 ${!isActive ? 'opacity-50' : ''}`} size={18} />
+              <span className={`text-gray-700 dark:text-gray-300 ${!isActive ? 'opacity-60' : ''}`}>
+                <strong>{String(key).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</strong> {String(value)}
+              </span>
+            </div>
+          ))
+        )}
       </div>
 
       {plan.features && plan.features.length > 0 && (
@@ -116,11 +147,14 @@ export function PlanCard({ plan, isActive = false, isPopular = false }) {
 
       {isActive && (
         <button
+           onClick={() => handleEdit(plan)}
+
           className={`w-full py-3 rounded-lg font-semibold transition-all ${
             isPopular
               ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white hover:from-yellow-600 hover:to-orange-600 shadow-lg hover:shadow-xl'
               : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700'
           }`}
+          title="Edit Plan"
         >
           Manage Plan
         </button>

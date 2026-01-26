@@ -3,7 +3,7 @@
 import { Building2, Users, Calendar, Search, Filter, Download, Plus, Eye, Edit, MoreVertical, Trash2, X, Save, AlertCircle, Coins, PlusCircle, MinusCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { organizationAPI } from '@/lib/api';
+import { organizationAPI, subscriptionAPI } from '@/lib/api';
 
 export default function OrganizationPage() {
   const router = useRouter();
@@ -29,20 +29,47 @@ export default function OrganizationPage() {
     try {
       const data = await organizationAPI.getAll();
       if (data.organizations) {
+        // Fetch all plans to map plan IDs to plan names
+        let plansMap = {};
+        try {
+          const plansResponse = await subscriptionAPI.getAll();
+          if (plansResponse.success && plansResponse.plans) {
+            plansMap = plansResponse.plans.reduce((acc, plan) => {
+              acc[plan.id] = plan;
+              return acc;
+            }, {});
+          }
+        } catch (error) {
+          console.error('Failed to fetch plans:', error);
+        }
+        
         // Transform backend data to match frontend format
-        const transformed = data.organizations.map((org) => ({
-          id: org.id,
-          name: org.name,
-          owner: org.owner_email || 'N/A',
-          ownerEmail: org.owner_email || 'N/A',
-          members: org.member_count || 0,
-          plan: 'Standard', // Default plan - can be enhanced later
-          planId: 'standard',
-          credits: org.credit_balance || 0,
-          creditsUsed: 0, // Will need to calculate from credit ledger
-          createdAt: org.created_at ? new Date(org.created_at).toISOString().split('T')[0] : 'N/A',
-          status: 'active',
-        }));
+        const transformed = data.organizations.map((org) => {
+          let planName = 'No Plan';
+          let planId = null;
+          
+          if (org.plan) {
+            const planIdStr = typeof org.plan === 'object' ? org.plan.id : org.plan;
+            planId = planIdStr;
+            if (plansMap[planIdStr]) {
+              planName = plansMap[planIdStr].name;
+            }
+          }
+          
+          return {
+            id: org.id,
+            name: org.name,
+            owner: org.owner_email || 'N/A',
+            ownerEmail: org.owner_email || 'N/A',
+            members: org.member_count || 0,
+            plan: planName,
+            planId: planId,
+            credits: org.credit_balance || 0,
+            creditsUsed: 0, // Will need to calculate from credit ledger
+            createdAt: org.created_at ? new Date(org.created_at).toISOString().split('T')[0] : 'N/A',
+            status: 'active',
+          };
+        });
         setOrganizations(transformed);
       } else {
         setOrganizations([]);
@@ -369,7 +396,15 @@ export default function OrganizationPage() {
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredOrganizations.map((org) => {
-              const creditsPercent = org.credits > 0 ? ((org.creditsUsed / org.credits) * 100).toFixed(0) : 0;
+              const creditsPercent = org.credits > 0 ? ((org.creditsUsed / org.credits) * 100) : 0;
+              const creditsPercentDisplay = creditsPercent.toFixed(0);
+              const creditsPercentNum = Number(creditsPercent);
+              // Color logic: 100-80% = red, 50-80% = yellow, below 50% = red
+              const getCreditsColor = () => {
+                if (creditsPercentNum >= 80) return 'bg-red-500';
+                if (creditsPercentNum >= 50) return 'bg-yellow-500';
+                return 'bg-red-500';
+              };
               return (
                 <div
                   key={org.id}
@@ -408,14 +443,12 @@ export default function OrganizationPage() {
                     <div className="space-y-1">
                       <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
                         <span>Credits Usage</span>
-                        <span className="font-medium">{creditsPercent}%</span>
+                        <span className="font-medium">{creditsPercentDisplay}%</span>
                       </div>
                       <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                         <div
-                          className={`h-2 rounded-full transition-all ${
-                            creditsPercent > 90 ? 'bg-red-500' : creditsPercent > 70 ? 'bg-yellow-500' : 'bg-green-500'
-                          }`}
-                          style={{ width: `${Math.min(creditsPercent, 100)}%` }}
+                          className={`h-2 rounded-full transition-all ${getCreditsColor()}`}
+                          style={{ width: `${Math.min(creditsPercentNum, 100)}%` }}
                         />
                       </div>
                       <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
@@ -498,7 +531,15 @@ export default function OrganizationPage() {
                 </thead>
                 <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
                   {filteredOrganizations.map((org) => {
-                    const creditsPercent = org.credits > 0 ? ((org.creditsUsed / org.credits) * 100).toFixed(0) : 0;
+                    const creditsPercent = org.credits > 0 ? ((org.creditsUsed / org.credits) * 100) : 0;
+                    const creditsPercentDisplay = creditsPercent.toFixed(0);
+                    const creditsPercentNum = Number(creditsPercent);
+                    // Color logic: 100-80% = red, 50-80% = yellow, below 50% = red
+                    const getCreditsColor = () => {
+                      if (creditsPercentNum >= 80) return 'bg-red-500';
+                      if (creditsPercentNum >= 50) return 'bg-yellow-500';
+                      return 'bg-red-500';
+                    };
                     return (
                       <tr key={org.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -528,13 +569,11 @@ export default function OrganizationPage() {
                           <div className="flex items-center gap-2">
                             <div className="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                               <div
-                                className={`h-2 rounded-full ${
-                                  creditsPercent > 90 ? 'bg-red-500' : creditsPercent > 70 ? 'bg-yellow-500' : 'bg-green-500'
-                                }`}
-                                style={{ width: `${Math.min(creditsPercent, 100)}%` }}
+                                className={`h-2 rounded-full ${getCreditsColor()}`}
+                                style={{ width: `${Math.min(creditsPercentNum, 100)}%` }}
                               />
                             </div>
-                            <span className="text-xs text-gray-600 dark:text-gray-400 w-12 text-right">{creditsPercent}%</span>
+                            <span className="text-xs text-gray-600 dark:text-gray-400 w-12 text-right">{creditsPercentDisplay}%</span>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{org.createdAt}</td>

@@ -14,15 +14,16 @@ import {
   Menu,
   X
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { authAPI } from '@/lib/api';
 
-const menuItems = [
+const allMenuItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Organization', href: '/dashboard/organization', icon: Building2 },
   { name: 'Subscriptions', href: '/dashboard/subscriptions', icon: CreditCard },
   { name: 'Payment History', href: '/dashboard/payment-history', icon: History },
   { name: 'Credits Usage', href: '/dashboard/credits-usage', icon: Coins },
-  { name: 'Image Generation History', href: '/dashboard/image-generation-history', icon: ImageIcon },
+  // { name: 'Image Generation History', href: '/dashboard/image-generation-history', icon: ImageIcon },
   { name: 'Prompt Master', href: '/dashboard/prompt-master', icon: FileText },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ];
@@ -30,6 +31,84 @@ const menuItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  // Start with subscriptions hidden by default (safer - will show if user has no organization)
+  const [menuItems, setMenuItems] = useState(allMenuItems.filter(item => item.name !== 'Subscriptions'));
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const response = await authAPI.getProfile();
+        console.log('User profile response:', response);
+        
+        if (response.success && response.user) {
+          const user = response.user;
+          console.log('User data:', user);
+          console.log('User organization:', user.organization);
+          console.log('User organization_id:', user.organization_id);
+          
+          // Check if user belongs to any organization - handle all possible formats
+          let belongsToOrganization = false;
+          
+          // Check organization_id first (most reliable)
+          if (user.organization_id && user.organization_id !== null && user.organization_id !== 'null' && user.organization_id !== 'undefined') {
+            belongsToOrganization = true;
+          }
+          // Check organization object
+          else if (user.organization && user.organization !== null && user.organization !== undefined) {
+            // If organization is an object with id
+            if (typeof user.organization === 'object' && user.organization.id) {
+              belongsToOrganization = true;
+            }
+            // If organization is a string/ObjectId (non-empty)
+            else if (typeof user.organization === 'string' && user.organization.trim() !== '') {
+              belongsToOrganization = true;
+            }
+            // If organization exists as an object with properties (not empty object)
+            else if (typeof user.organization === 'object' && Object.keys(user.organization).length > 0) {
+              belongsToOrganization = true;
+            }
+          }
+          
+          console.log('Belongs to organization:', belongsToOrganization);
+          
+          // Filter menu items based on user role
+          // Rule: Hide Subscriptions if user belongs to ANY organization (owner or member)
+          // Show Subscriptions ONLY if user does NOT belong to any organization
+          const filteredItems = allMenuItems.filter(item => {
+            if (item.name === 'Subscriptions') {
+              // Hide if user belongs to any organization (regardless of role)
+              if (belongsToOrganization) {
+                console.log('Hiding Subscriptions - user belongs to organization');
+                return false;
+              }
+              // Show only if user doesn't belong to any organization
+              console.log('Showing Subscriptions - user does not belong to organization');
+              return true;
+            }
+            return true;
+          });
+          
+          console.log('Filtered menu items:', filteredItems);
+          setMenuItems(filteredItems);
+        } else {
+          console.log('Profile fetch failed or no user data');
+          // If profile fetch fails, hide subscriptions by default (safer)
+          const filteredItems = allMenuItems.filter(item => item.name !== 'Subscriptions');
+          setMenuItems(filteredItems);
+        }
+      } catch (error) {
+        console.error('Failed to fetch user profile:', error);
+        // On error, hide subscriptions by default (safer approach)
+        const filteredItems = allMenuItems.filter(item => item.name !== 'Subscriptions');
+        setMenuItems(filteredItems);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
 
   return (
     <>

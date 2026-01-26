@@ -1,18 +1,6 @@
-// Simple utility function to merge class names
-export function cn(...inputs) {
-  return inputs
-    .filter(Boolean)
-    .map((input) => {
-      if (typeof input === 'string') return input;
-      if (typeof input === 'object' && input !== null) {
-        return Object.entries(input)
-          .filter(([, value]) => value)
-          .map(([key]) => key)
-          .join(' ');
-      }
-      return '';
-    })
-    .join(' ')
-    .trim();
-}
+import { clsx } from "clsx";
+import { twMerge } from "tailwind-merge"
 
+export function cn(...inputs) {
+  return twMerge(clsx(inputs));
+}
