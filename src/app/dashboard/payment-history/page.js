@@ -1,13 +1,20 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { DollarSign, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { DollarSign, CheckCircle, XCircle, Clock, Loader2, Eye, FileText, Settings } from 'lucide-react';
 import { paymentAPI } from '@/lib/api';
+import { InvoiceView } from '@/components/InvoiceView';
+import { InvoiceTemplateEditor } from '@/components/InvoiceTemplateEditor';
+import { Button } from '@/components/ui/button';
 
 export default function PaymentHistoryPage() {
+  const router = useRouter();
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [showTemplateEditor, setShowTemplateEditor] = useState(false);
 
   useEffect(() => {
     fetchPayments();
@@ -100,6 +107,24 @@ export default function PaymentHistoryPage() {
               View all payment transactions
             </p>
           </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => router.push('/dashboard/invoice-settings')}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <Settings className="w-4 h-4" />
+              Invoice Settings
+            </Button>
+            <Button
+              onClick={() => setShowTemplateEditor(true)}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <FileText className="w-4 h-4" />
+              Edit Template
+            </Button>
+          </div>
           <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-4">
             <div className="flex items-center gap-2">
               <DollarSign className="text-green-500" size={24} />
@@ -146,6 +171,9 @@ export default function PaymentHistoryPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Transaction ID
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
@@ -181,6 +209,20 @@ export default function PaymentHistoryPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400 font-mono">
                         {payment.transactionId}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Button
+                          onClick={() => setSelectedInvoice({
+                            transactionId: payment.transactionId,
+                            paymentData: payment
+                          })}
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-2"
+                        >
+                          <Eye className="w-4 h-4" />
+                          View Invoice
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -193,6 +235,22 @@ export default function PaymentHistoryPage() {
           )}
         </div>
       </div>
+      
+      {/* Invoice View Modal */}
+      {selectedInvoice && (
+        <InvoiceView
+          transactionId={selectedInvoice.transactionId}
+          paymentData={selectedInvoice.paymentData}
+          onClose={() => setSelectedInvoice(null)}
+        />
+      )}
+      
+      {/* Invoice Template Editor Modal */}
+      {showTemplateEditor && (
+        <InvoiceTemplateEditor
+          onClose={() => setShowTemplateEditor(false)}
+        />
+      )}
     </>
   );
 }

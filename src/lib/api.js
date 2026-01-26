@@ -160,6 +160,38 @@ export const paymentAPI = {
 };
 
 /**
+ * Invoice API functions
+ */
+export const invoiceAPI = {
+  getInvoice: (transactionId) =>
+    apiRequest(`/api/invoices/${transactionId}/`),
+  getConfig: () =>
+    apiRequest(`/api/invoices/config/`),
+  updateConfig: (config) => apiRequest('/api/invoices/config/', {
+    method: 'PUT',
+    body: JSON.stringify(config),
+  }),
+  downloadInvoice: (transactionId) => {
+    const url = `${API_BASE_URL}/api/invoices/${transactionId}/download/`;
+    const token = typeof window !== "undefined" ? (localStorage.getItem("auth_token") || localStorage.getItem("token")) : null;
+    
+    return fetch(url, {
+      headers: {
+        Authorization: token ? `Bearer ${token}` : "",
+      },
+    }).then((response) => {
+      if (!response.ok) throw new Error("Failed to download invoice");
+      return response.blob();
+    });
+  },
+  getTemplate: () => apiRequest('/api/invoices/template/'),
+  updateTemplate: (template) => apiRequest('/api/invoices/template/', {
+    method: 'PUT',
+    body: JSON.stringify({ template }),
+  }),
+};
+
+/**
  * Credits Usage API functions
  * Based on CreditLedger model from splash_backend/CREDITS/models.py
  */
