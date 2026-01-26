@@ -33,7 +33,8 @@ export default function CreditsUsagePage() {
   const [typeFilter, setTypeFilter] = useState('all'); // 'all', 'debit', 'credit'
   const [creditSettings, setCreditSettings] = useState({
     credits_per_image_generation: 2,
-    credits_per_regeneration: 1
+    credits_per_regeneration: 1,
+    default_image_model_name: 'gemini-3-pro-image-preview',
   });
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -79,7 +80,8 @@ export default function CreditsUsagePage() {
         if (settingsData.success && settingsData.settings) {
           setCreditSettings({
             credits_per_image_generation: settingsData.settings.credits_per_image_generation || 2,
-            credits_per_regeneration: settingsData.settings.credits_per_regeneration || 1
+            credits_per_regeneration: settingsData.settings.credits_per_regeneration || 1,
+            default_image_model_name: settingsData.settings.default_image_model_name || 'gemini-3-pro-image-preview',
           });
         }
         setError(null);
@@ -473,7 +475,7 @@ export default function CreditsUsagePage() {
               <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                   <Settings size={24} />
-                  Edit Credit Deduction Settings
+                  Edit Credit & Model Settings
                 </h2>
                 <button
                   onClick={() => setShowSettingsModal(false)}
@@ -521,6 +523,30 @@ export default function CreditsUsagePage() {
                   />
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Number of credits deducted for each image regeneration
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    AI Model for Image Generation
+                  </label>
+                  <select
+                    value={creditSettings.default_image_model_name}
+                    onChange={(e) => setCreditSettings({
+                      ...creditSettings,
+                      default_image_model_name: e.target.value,
+                    })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="gemini-3-pro-image-preview">
+                      Gemini 3 Pro (Image Preview)
+                    </option>
+                    <option value="gemini-2.5-flash-image">
+                      Gemini 2.5 Flash (Image)
+                    </option>
+                  </select>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Global Gemini model used for background removal, model shots, and campaign images.
                   </p>
                 </div>
 
