@@ -26,6 +26,7 @@ const allMenuItems = [
   // { name: 'Image Generation History', href: '/dashboard/image-generation-history', icon: ImageIcon },
   { name: 'Prompt Master', href: '/dashboard/prompt-master', icon: FileText },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+  
 ];
 
 export default function Sidebar() {
