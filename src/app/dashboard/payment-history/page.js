@@ -29,8 +29,14 @@ export default function PaymentHistoryPage() {
         // Transform API data to match component format
         const transformed = response.transactions.map((txn) => ({
           id: txn.id,
-          organization: txn.organization_name || 'Unknown',
-          organizationId: txn.organization_id,
+          organization: txn.is_single_user 
+            ? (txn.user_name || txn.user_email || 'Individual User')
+            : (txn.organization_name || 'Unknown Organization'),
+          organizationId: txn.organization_id || null,
+          userId: txn.user_id || null,
+          userEmail: txn.user_email || null,
+          userName: txn.user_name || null,
+          isSingleUser: txn.is_single_user || false,
           amount: txn.amount,
           status: txn.status === 'completed' ? 'Completed' : 
                   txn.status === 'pending' ? 'Pending' : 
@@ -154,7 +160,7 @@ export default function PaymentHistoryPage() {
                       Date
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Organization
+                      Organization / User
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Plan
@@ -183,7 +189,19 @@ export default function PaymentHistoryPage() {
                         {payment.date}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                        {payment.organization}
+                        <div className="flex items-center gap-2">
+                          {payment.isSingleUser && (
+                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300">
+                              Individual
+                            </span>
+                          )}
+                          <span>{payment.organization}</span>
+                          {payment.userEmail && (
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              ({payment.userEmail})
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
                         {payment.plan}
@@ -213,7 +231,13 @@ export default function PaymentHistoryPage() {
                         <Button
                           onClick={() => setSelectedInvoice({
                             transactionId: payment.transactionId,
-                            paymentData: payment
+                            paymentData: {
+                              ...payment,
+                              is_single_user: payment.isSingleUser,
+                              user_name: payment.userName,
+                              user_email: payment.userEmail,
+                              organization_name: payment.organization
+                            }
                           })}
                           variant="outline"
                           size="sm"

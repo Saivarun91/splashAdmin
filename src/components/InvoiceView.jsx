@@ -230,7 +230,9 @@ export function InvoiceView({ transactionId, onClose, paymentData }) {
 
                         <div style={styles.billing}>
                             <h4>Billed to:</h4>
-                            <p>{invoiceData.client_name || invoiceData.organization || invoiceData.organization_name || "Organization Name"}</p>
+                            <p>{invoiceData.client_name || (invoiceData.is_single_user || invoiceData.isSingleUser 
+                                ? (invoiceData.user_name || invoiceData.user_email || "Individual User")
+                                : (invoiceData.organization || invoiceData.organization_name || "Organization Name"))}</p>
                             <p>{invoiceData.client_address || invoiceData.organization_address || invoiceData.organization?.address || "123 Anywhere St., Any City"}</p>
                             <p>{invoiceData.client_phone || invoiceData.organization_phone || invoiceData.organization?.phone || invoiceData.organization?.phone_number || "+123-456-7890"}</p>
                         </div>
