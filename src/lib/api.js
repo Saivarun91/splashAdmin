@@ -71,6 +71,17 @@ export const authAPI = {
 };
 
 /**
+ * API Service wrapper for compatibility with AuthContext
+ * Wraps authAPI to match the expected apiService interface
+ */
+export const apiService = {
+  login: authAPI.login,
+  register: authAPI.register,
+  getProfile: authAPI.getProfile,
+  updateProfile: authAPI.updateProfile,
+};
+
+/**
  * Dashboard API functions
  * Admin dashboard statistics
  */
@@ -123,6 +134,7 @@ export const organizationAPI = {
   }),
 };
 
+
 /**
  * Subscription/Plan API functions
  * Based on Plan model from splash_backend/plans/models.py
@@ -144,6 +156,49 @@ export const subscriptionAPI = {
     method: 'DELETE'
   }),
 };
+
+
+
+// Prompt Master endpoints
+export const promptMasterAPI = {
+  getPrompts: (token) => apiRequest('/probackendapp/api/prompts/', {
+    headers: {
+      'Authorization': `Bearer ${token || ''}`,
+    },
+  }),
+  getPrompt: (promptId, token) => apiRequest(`/probackendapp/api/prompts/${promptId}/`, {
+    headers: {
+      'Authorization': `Bearer ${token || ''}`,
+    },
+  }),
+  createPrompt: (promptData, token) => apiRequest('/probackendapp/api/prompts/create/', {
+    method: 'POST',
+    body: JSON.stringify(promptData),
+    headers: {
+      'Authorization': `Bearer ${token || ''}`,
+    },
+  }),
+  updatePrompt: (promptId, promptData, token) => apiRequest(`/probackendapp/api/prompts/${promptId}/update/`, {
+    method: 'PUT',
+    body: JSON.stringify(promptData),
+    headers: {
+      'Authorization': `Bearer ${token || ''}`,
+    },
+  }),
+  deletePrompt: (promptId, token) => apiRequest(`/probackendapp/api/prompts/${promptId}/delete/`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${token || ''}`,
+    },
+  }),
+  initializePrompts: (token) => apiRequest('/probackendapp/api/prompts/initialize/', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token || ''}`,
+    },
+  }),
+};
+
 
 /**
  * Payment API functions

@@ -1,9 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CreditCard, TrendingUp, Zap, Building2, Download, Plus, Edit, Trash2, X, Save, DollarSign, Loader2 } from 'lucide-react';
-import { PlanCard } from '@/components/subscriptions/PlanCard';
+import { CreditCard, TrendingUp, Zap, Building2, DollarSign, Plus, Edit, X, Save, Loader2, Crown } from 'lucide-react';
 import { subscriptionAPI, paymentAPI } from '@/lib/api';
+
+const PRO_NAME = 'Pro';
+const ENTERPRISE_NAME = 'Enterprise';
+
+const DEFAULT_CREDIT_OPTIONS = [
+  { amount: 50, credits: 50 },
+  { amount: 100, credits: 100 },
+  { amount: 300, credits: 300 },
+];
 
 export default function SubscriptionsPage() {
   const [plans, setPlans] = useState([]);
@@ -17,23 +25,19 @@ export default function SubscriptionsPage() {
     total_transactions: 0,
   });
   const [showModal, setShowModal] = useState(false);
+  const [editingPlanType, setEditingPlanType] = useState(null); // 'pro' | 'enterprise'
   const [editingPlan, setEditingPlan] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    price: '',
-    original_price: '',
+    price: 0,
     currency: 'USD',
-    billing_cycle: 'monthly',
-    credits_per_month: 1000,
-    max_projects: 10,
-    ai_features_enabled: true,
     features: [''],
-    is_active: true,
-    is_popular: false,
+    credit_options: [...DEFAULT_CREDIT_OPTIONS],
+    amount_display: 'As you go',
+    cta_text: 'Pay',
   });
 
-  // Fetch plans and revenue from API
   useEffect(() => {
     fetchPlans();
     fetchRevenueStats();
@@ -73,69 +77,101 @@ export default function SubscriptionsPage() {
     }
   };
 
-  const handleCreate = () => {
-    setEditingPlan(null);
-    setFormData({
-      name: '',
-      description: '',
-      price: '',
-      original_price: '',
-      currency: 'USD',
-      billing_cycle: 'monthly',
-      credits_per_month: 1000,
-      max_projects: 10,
-      ai_features_enabled: true,
-      features: [''],
-      is_active: true,
-      is_popular: false,
-    });
+  const proPlan = plans.find((p) => (p.name || '').toLowerCase() === 'pro');
+  const enterprisePlan = plans.find((p) => (p.name || '').toLowerCase() === 'enterprise');
+
+  const openEditPro = () => {
+    setEditingPlanType('pro');
+    if (proPlan) {
+      const opts = proPlan.credit_options || proPlan.custom_settings?.credit_options || DEFAULT_CREDIT_OPTIONS;
+      setFormData({
+        name: PRO_NAME,
+        description: proPlan.description || '',
+        price: Array.isArray(opts) && opts[0] ? opts[0].amount : 50,
+        currency: proPlan.currency || 'USD',
+        features: (proPlan.features && proPlan.features.length) ? proPlan.features : [''],
+        credit_options: Array.isArray(opts) && opts.length ? opts : [...DEFAULT_CREDIT_OPTIONS],
+        amount_display: 'As you go',
+        cta_text: proPlan.custom_settings?.cta_text || proPlan.cta_text || 'Pay',
+      });
+      setEditingPlan(proPlan);
+    } else {
+      setFormData({
+        name: PRO_NAME,
+        description: 'Professional plan with flexible credits.',
+        price: 50,
+        currency: 'USD',
+        features: [''],
+        credit_options: [...DEFAULT_CREDIT_OPTIONS],
+        amount_display: 'As you go',
+        cta_text: 'Pay',
+      });
+      setEditingPlan(null);
+    }
     setShowModal(true);
   };
 
-  const handleEdit = (plan) => {
-    setEditingPlan(plan);
-    setFormData({
-      name: plan.name || '',
-      description: plan.description || '',
-      price: plan.price || '',
-      original_price: plan.original_price || '',
-      currency: plan.currency || 'USD',
-      billing_cycle: plan.billing_cycle || 'monthly',
-      credits_per_month: plan.credits_per_month || 1000,
-      max_projects: plan.max_projects || 10,
-      ai_features_enabled: plan.ai_features_enabled !== undefined ? plan.ai_features_enabled : true,
-      features: plan.features && plan.features.length > 0 ? plan.features : [''],
-      is_active: plan.is_active !== undefined ? plan.is_active : true,
-      is_popular: plan.is_popular || false,
-    });
+  const openEditEnterprise = () => {
+    setEditingPlanType('enterprise');
+    if (enterprisePlan) {
+      const cs = enterprisePlan.custom_settings || {};
+      setFormData({
+        name: ENTERPRISE_NAME,
+        description: enterprisePlan.description || '',
+        price: 0,
+        currency: enterprisePlan.currency || 'USD',
+        features: (enterprisePlan.features && enterprisePlan.features.length) ? enterprisePlan.features : [''],
+        credit_options: [],
+        amount_display: cs.amount_display || 'As you go',
+        cta_text: cs.cta_text || 'Contact Sales',
+      });
+      setEditingPlan(enterprisePlan);
+    } else {
+      setFormData({
+        name: ENTERPRISE_NAME,
+        description: 'Custom enterprise solutions.',
+        price: 0,
+        currency: 'USD',
+        features: [''],
+        credit_options: [],
+        amount_display: 'As you go',
+        cta_text: 'Contact Sales',
+      });
+      setEditingPlan(null);
+    }
     setShowModal(true);
-  };
-
-  const handleDelete = async (planId) => {
-    if (!confirm('Are you sure you want to delete this plan? This action cannot be undone.')) {
-      return;
-    }
-
-    try {
-      await subscriptionAPI.delete(planId);
-      fetchPlans();
-    } catch (error) {
-      console.error('Failed to delete plan:', error);
-      alert('Failed to delete plan. Please try again.');
-    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     try {
+      const isPro = editingPlanType === 'pro';
+      const custom_settings = {
+        cta_text: formData.cta_text,
+      };
+      if (isPro) {
+        custom_settings.credit_options = formData.credit_options.filter((o) => o && (o.amount != null || o.credits != null));
+      } else {
+        custom_settings.amount_display = formData.amount_display;
+      }
+
+      const price = isPro && formData.credit_options.length
+        ? formData.credit_options[0].amount
+        : 0;
+
       const submitData = {
-        ...formData,
-        price: parseFloat(formData.price),
-        original_price: formData.original_price ? parseFloat(formData.original_price) : null,
-        credits_per_month: parseInt(formData.credits_per_month),
-        max_projects: parseInt(formData.max_projects),
-        features: formData.features.filter(f => f.trim() !== ''),
+        name: formData.name,
+        description: formData.description,
+        price: Number(price),
+        currency: formData.currency,
+        billing_cycle: 'monthly',
+        credits_per_month: isPro && formData.credit_options[0] ? formData.credit_options[0].credits : 0,
+        max_projects: 999,
+        ai_features_enabled: true,
+        features: formData.features.filter((f) => f.trim() !== ''),
+        is_active: true,
+        is_popular: isPro,
+        custom_settings,
       };
 
       if (editingPlan) {
@@ -143,12 +179,11 @@ export default function SubscriptionsPage() {
       } else {
         await subscriptionAPI.create(submitData);
       }
-      
       setShowModal(false);
       fetchPlans();
     } catch (error) {
       console.error('Failed to save plan:', error);
-      alert(`Failed to ${editingPlan ? 'update' : 'create'} plan. Please try again.`);
+      alert(`Failed to save plan. Please try again.`);
     }
   };
 
@@ -167,31 +202,29 @@ export default function SubscriptionsPage() {
     setFormData({ ...formData, features: newFeatures.length > 0 ? newFeatures : [''] });
   };
 
-  const activePlans = plans.filter(plan => plan.is_active);
-  const inactivePlans = plans.filter(plan => !plan.is_active);
-  const totalCredits = activePlans.reduce((sum, plan) => sum + (plan.credits_per_month || 0), 0);
+  const handleCreditOptionChange = (index, field, value) => {
+    const opts = [...(formData.credit_options || [])];
+    if (!opts[index]) opts[index] = { amount: 0, credits: 0 };
+    opts[index][field] = field === 'amount' || field === 'credits' ? Number(value) : value;
+    setFormData({ ...formData, credit_options: opts });
+  };
 
-  // Transform plan data for PlanCard component
-  const transformPlanForCard = (plan) => ({
-    id: plan.id,
-    name: plan.name,
-    description: plan.description,
-    price: plan.price,
-    originalPrice: plan.original_price,
-    currency: plan.currency || 'USD',
-    billingCycle: plan.billing_cycle,
-    credits_per_month: plan.credits_per_month,
-    max_projects: plan.max_projects,
-    ai_features_enabled: plan.ai_features_enabled,
-    features: plan.features || [],
-    isActive: plan.is_active,
-    isPopular: plan.is_popular,
-  });
+  const addCreditOption = () => {
+    setFormData({
+      ...formData,
+      credit_options: [...(formData.credit_options || []), { amount: 100, credits: 100 }],
+    });
+  };
+
+  const removeCreditOption = (index) => {
+    const opts = formData.credit_options.filter((_, i) => i !== index);
+    setFormData({ ...formData, credit_options: opts.length ? opts : [...DEFAULT_CREDIT_OPTIONS] });
+  };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <Loader2 className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
       </div>
     );
   }
@@ -199,37 +232,19 @@ export default function SubscriptionsPage() {
   return (
     <>
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
-              Plan Management
+              Pricing Plans
             </h1>
             <p className="text-gray-600 dark:text-gray-400 mt-2 text-lg">
-              Create and manage subscription plans
+              Edit Pro and Enterprise plan content shown across the portal
             </p>
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={handleCreate}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg text-sm font-medium"
-            >
-              <Plus size={18} />
-              Create Plan
-            </button>
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl p-5 border border-blue-200 dark:border-blue-800">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-blue-900 dark:text-blue-300">Total Plans</p>
-              <CreditCard className="text-blue-600 dark:text-blue-400" size={20} />
-            </div>
-            <p className="text-3xl font-bold text-blue-900 dark:text-blue-100">{plans.length}</p>
-            <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">{activePlans.length} active</p>
-          </div>
+        {/* Revenue summary */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-xl p-5 border border-green-200 dark:border-green-800">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-medium text-green-900 dark:text-green-300">Monthly Revenue</p>
@@ -238,25 +253,9 @@ export default function SubscriptionsPage() {
             {revenueLoading ? (
               <Loader2 className="w-8 h-8 animate-spin text-green-600 dark:text-green-400" />
             ) : (
-              <>
-                <p className="text-3xl font-bold text-green-900 dark:text-green-100">
-                  ₹{revenueData.monthly_revenue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-                <div className="flex items-center gap-1 mt-1">
-                  <p className="text-xs text-green-700 dark:text-green-300">
-                    {revenueData.monthly_transactions} transactions
-                  </p>
-                  {revenueData.growth_percentage !== 0 && (
-                    <span className={`text-xs font-medium ${
-                      revenueData.growth_percentage > 0 
-                        ? 'text-green-700 dark:text-green-300' 
-                        : 'text-red-700 dark:text-red-300'
-                    }`}>
-                      {revenueData.growth_percentage > 0 ? '↑' : '↓'} {Math.abs(revenueData.growth_percentage).toFixed(1)}%
-                    </span>
-                  )}
-                </div>
-              </>
+              <p className="text-3xl font-bold text-green-900 dark:text-green-100">
+                ${revenueData.monthly_revenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
             )}
           </div>
           <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 rounded-xl p-5 border border-emerald-200 dark:border-emerald-800">
@@ -267,319 +266,226 @@ export default function SubscriptionsPage() {
             {revenueLoading ? (
               <Loader2 className="w-8 h-8 animate-spin text-emerald-600 dark:text-emerald-400" />
             ) : (
-              <>
-                <p className="text-3xl font-bold text-emerald-900 dark:text-emerald-100">
-                  ₹{revenueData.total_revenue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-                <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1">
-                  {revenueData.total_transactions} total transactions
-                </p>
-              </>
+              <p className="text-3xl font-bold text-emerald-900 dark:text-emerald-100">
+                ${revenueData.total_revenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
             )}
           </div>
-          <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-xl p-5 border border-purple-200 dark:border-purple-800">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-purple-900 dark:text-purple-300">Total Credits</p>
-              <Zap className="text-purple-600 dark:text-purple-400" size={20} />
-            </div>
-            <p className="text-3xl font-bold text-purple-900 dark:text-purple-100">{totalCredits.toLocaleString()}</p>
-            <p className="text-xs text-purple-700 dark:text-purple-300 mt-1">Allocated</p>
-          </div>
-          <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-xl p-5 border border-orange-200 dark:border-orange-800">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-orange-900 dark:text-orange-300">Active Plans</p>
-              <Building2 className="text-orange-600 dark:text-orange-400" size={20} />
-            </div>
-            <p className="text-3xl font-bold text-orange-900 dark:text-orange-100">{activePlans.length}</p>
-            <p className="text-xs text-orange-700 dark:text-orange-300 mt-1">Currently active</p>
-          </div>
         </div>
 
-        {/* Active Plans */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Active Pricing Plans</h2>
+        {/* Two plan cards only */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl">
+          {/* Pro Plan Card */}
+          <div className="relative rounded-2xl border-2 border-blue-200 dark:border-blue-800 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-8 shadow-lg">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600">
+                <Crown className="text-white" size={24} />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Pro Plan</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {proPlan?.description || 'Professional plan with flexible credits'}
+                </p>
+              </div>
+            </div>
+            <div className="mb-4">
+              <span className="text-3xl font-bold text-gray-900 dark:text-white">
+                ${(proPlan?.credit_options?.[0]?.amount ?? proPlan?.price ?? 50)}
+              </span>
+              <span className="text-gray-500 dark:text-gray-400 ml-1">starting</span>
+            </div>
+            {proPlan?.features?.length > 0 && (
+              <ul className="space-y-2 mb-6">
+                {proPlan.features.slice(0, 3).map((f, i) => (
+                  <li key={i} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                    <span className="text-blue-600">✓</span> {f}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button
+              onClick={openEditPro}
+              className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all"
+            >
+              <Edit size={18} />
+              {proPlan ? 'Edit Pro Plan' : 'Add Pro Plan'}
+            </button>
           </div>
-          {activePlans.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-              {activePlans.map((plan) => (
-                <div key={plan.id} className="relative">
-                  <PlanCard plan={transformPlanForCard(plan)} isActive={true} isPopular={plan.is_popular} />
-                  <div className="absolute top-4 right-4 flex gap-2">
-                    <button
-                      onClick={() => handleEdit(plan)}
-                      className="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                      title="Edit Plan"
-                    >
-                      <Edit size={16} className="text-blue-600 dark:text-blue-400" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(plan.id)}
-                      className="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                      title="Delete Plan"
-                    >
-                      <Trash2 size={16} className="text-red-600 dark:text-red-400" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-              <p className="text-gray-500 dark:text-gray-400">No active plans. Create your first plan to get started.</p>
-            </div>
-          )}
-        </div>
 
-        {/* Inactive Plans */}
-        {inactivePlans.length > 0 && (
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Inactive Plans</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {inactivePlans.map((plan) => (
-                <div key={plan.id} className="relative">
-                  <PlanCard plan={transformPlanForCard(plan)} isActive={false} isPopular={false} />
-                  <div className="absolute top-4 right-4 flex gap-2">
-                    <button
-                      onClick={() => handleEdit(plan)}
-                      className="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                      title="Edit Plan"
-                    >
-                      <Edit size={16} className="text-blue-600 dark:text-blue-400" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(plan.id)}
-                      className="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                      title="Delete Plan"
-                    >
-                      <Trash2 size={16} className="text-red-600 dark:text-red-400" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+          {/* Enterprise Plan Card */}
+          <div className="relative rounded-2xl border-2 border-purple-200 dark:border-purple-800 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-8 shadow-lg">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600">
+                <Building2 className="text-white" size={24} />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Enterprise Plan</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {enterprisePlan?.description || 'Custom enterprise solutions'}
+                </p>
+              </div>
             </div>
+            <div className="mb-4">
+              <span className="text-3xl font-bold text-gray-900 dark:text-white">
+                {enterprisePlan?.custom_settings?.amount_display ?? 'As you go'}
+              </span>
+            </div>
+            {enterprisePlan?.features?.length > 0 && (
+              <ul className="space-y-2 mb-6">
+                {enterprisePlan.features.slice(0, 3).map((f, i) => (
+                  <li key={i} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                    <span className="text-purple-600">✓</span> {f}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button
+              onClick={openEditEnterprise}
+              className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all"
+            >
+              <Edit size={18} />
+              {enterprisePlan ? 'Edit Enterprise Plan' : 'Add Enterprise Plan'}
+            </button>
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Create/Edit Modal */}
+      {/* Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {editingPlan ? 'Edit Plan' : 'Create New Plan'}
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                {editingPlan ? `Edit ${formData.name} Plan` : `Add ${formData.name} Plan`}
               </h2>
-              <button
-                onClick={() => setShowModal(false)}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              >
+              <button type="button" onClick={() => setShowModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
                 <X size={24} className="text-gray-500 dark:text-gray-400" />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Plan Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Currency *
-                  </label>
-                  <select
-                    value={formData.currency}
-                    onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  >
-                    <option value="USD">USD ($)</option>
-                    <option value="INR">INR (₹)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Price ({formData.currency === 'USD' ? '$' : '₹'}) *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Original Price ({formData.currency === 'USD' ? '$' : '₹'}) (Optional - for discounts)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.original_price}
-                    onChange={(e) => setFormData({ ...formData, original_price: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Billing Cycle *
-                  </label>
-                  <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="billing_cycle"
-                        value="monthly"
-                        checked={formData.billing_cycle === 'monthly'}
-                        onChange={(e) => setFormData({ ...formData, billing_cycle: e.target.value })}
-                        className="w-4 h-4"
-                      />
-                      <span className="text-sm text-gray-700 dark:text-gray-300">Monthly</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="billing_cycle"
-                        value="yearly"
-                        checked={formData.billing_cycle === 'yearly'}
-                        onChange={(e) => setFormData({ ...formData, billing_cycle: e.target.value })}
-                        className="w-4 h-4"
-                      />
-                      <span className="text-sm text-gray-700 dark:text-gray-300">Annual</span>
-                    </label>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Credits per Month *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    value={formData.credits_per_month}
-                    onChange={(e) => setFormData({ ...formData, credits_per_month: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Max Projects *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    value={formData.max_projects}
-                    onChange={(e) => setFormData({ ...formData, max_projects: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Plan Name</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  readOnly
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Description
-                </label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   rows={3}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  placeholder="Plan description shown on the card"
                 />
               </div>
 
+              {editingPlanType === 'pro' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Credit options (amount → credits)</label>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Users choose one; amount updates accordingly. e.g. $50 - 50 credits</p>
+                    {(formData.credit_options || []).map((opt, index) => (
+                      <div key={index} className="flex gap-2 mb-2">
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={opt.amount ?? ''}
+                          onChange={(e) => handleCreditOptionChange(index, 'amount', e.target.value)}
+                          placeholder="Amount ($)"
+                          className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        />
+                        <span className="self-center text-gray-500">-</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={opt.credits ?? ''}
+                          onChange={(e) => handleCreditOptionChange(index, 'credits', e.target.value)}
+                          placeholder="Credits"
+                          className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        />
+                        <button type="button" onClick={() => removeCreditOption(index)} className="px-3 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg">
+                          <X size={18} />
+                        </button>
+                      </div>
+                    ))}
+                    <button type="button" onClick={addCreditOption} className="mt-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm hover:bg-gray-300 dark:hover:bg-gray-600">
+                      + Add option
+                    </button>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Button text</label>
+                    <input
+                      type="text"
+                      value={formData.cta_text}
+                      onChange={(e) => setFormData({ ...formData, cta_text: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      placeholder="Pay"
+                    />
+                  </div>
+                </>
+              )}
+
+              {editingPlanType === 'enterprise' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Amount display text</label>
+                    <input
+                      type="text"
+                      value={formData.amount_display}
+                      onChange={(e) => setFormData({ ...formData, amount_display: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      placeholder="As you go"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Button text</label>
+                    <input
+                      type="text"
+                      value={formData.cta_text}
+                      onChange={(e) => setFormData({ ...formData, cta_text: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      placeholder="Contact Sales"
+                    />
+                  </div>
+                </>
+              )}
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Features
-                </label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Features (one per line)</label>
                 {formData.features.map((feature, index) => (
                   <div key={index} className="flex gap-2 mb-2">
                     <input
                       type="text"
                       value={feature}
                       onChange={(e) => handleFeatureChange(index, e.target.value)}
-                      placeholder="Enter feature"
+                      placeholder="Feature"
                       className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
-                    <button
-                      type="button"
-                      onClick={() => removeFeature(index)}
-                      className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-                    >
+                    <button type="button" onClick={() => removeFeature(index)} className="px-3 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg">
                       <X size={16} />
                     </button>
                   </div>
                 ))}
-                <button
-                  type="button"
-                  onClick={addFeature}
-                  className="mt-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm"
-                >
-                  + Add Feature
+                <button type="button" onClick={addFeature} className="mt-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm hover:bg-gray-300 dark:hover:bg-gray-600">
+                  + Add feature
                 </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.ai_features_enabled}
-                    onChange={(e) => setFormData({ ...formData, ai_features_enabled: e.target.checked })}
-                    className="w-4 h-4"
-                  />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">AI Features Enabled</span>
-                </label>
-
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.is_active}
-                    onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                    className="w-4 h-4"
-                  />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Active</span>
-                </label>
-
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.is_popular}
-                    onChange={(e) => setFormData({ ...formData, is_popular: e.target.checked })}
-                    className="w-4 h-4"
-                  />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Mark as Popular</span>
-                </label>
               </div>
 
               <div className="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >
+                <button type="button" onClick={() => setShowModal(false)} className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg flex items-center gap-2"
-                >
+                <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
                   <Save size={18} />
-                  {editingPlan ? 'Update Plan' : 'Create Plan'}
+                  Save
                 </button>
               </div>
             </form>
