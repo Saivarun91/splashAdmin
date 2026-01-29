@@ -192,6 +192,18 @@ export const invoiceAPI = {
 };
 
 /**
+ * Mail Templates API (admin only)
+ */
+export const mailTemplatesAPI = {
+  getAll: () => apiRequest('/api/mail-templates/'),
+  getBySlug: (slug) => apiRequest(`/api/mail-templates/${slug}/`),
+  update: (slug, data) => apiRequest(`/api/mail-templates/${slug}/`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+};
+
+/**
  * Credits Usage API functions
  * Based on CreditLedger model from splash_backend/CREDITS/models.py
  */
