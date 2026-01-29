@@ -10,6 +10,7 @@ import {
   Coins,
   Image as ImageIcon,
   FileText,
+  Mail,
   Settings,
   Menu,
   X
@@ -25,8 +26,8 @@ const allMenuItems = [
   { name: 'Credits Usage', href: '/dashboard/credits-usage', icon: Coins },
   // { name: 'Image Generation History', href: '/dashboard/image-generation-history', icon: ImageIcon },
   { name: 'Prompt Master', href: '/dashboard/prompt-master', icon: FileText },
+  { name: 'Mail Templates', href: '/dashboard/mail-templates', icon: Mail },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
-  
 ];
 
 export default function Sidebar() {

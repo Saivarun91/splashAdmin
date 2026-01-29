@@ -48,6 +48,7 @@ export default function PaymentHistoryPage() {
           currency: txn.currency || 'INR',
         }));
         setPayments(transformed);
+        console.log(transformed);
       } else {
         setPayments([]);
       }
@@ -122,14 +123,7 @@ export default function PaymentHistoryPage() {
               <Settings className="w-4 h-4" />
               Invoice Settings
             </Button>
-            <Button
-              onClick={() => setShowTemplateEditor(true)}
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              <FileText className="w-4 h-4" />
-              Edit Template
-            </Button>
+            
           </div>
           <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-4">
             <div className="flex items-center gap-2">
@@ -190,17 +184,14 @@ export default function PaymentHistoryPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                         <div className="flex items-center gap-2">
-                          {payment.isSingleUser && (
-                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300">
-                              Individual
-                            </span>
-                          )}
                           <span>{payment.organization}</span>
-                          {payment.userEmail && (
-                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                              ({payment.userEmail})
+                          {payment.isSingleUser && (
+                            <span className="px-2 py-1 text-xs font-medium">
+                              (Individual)
                             </span>
                           )}
+                         
+                          
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
@@ -225,9 +216,10 @@ export default function PaymentHistoryPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400 font-mono">
-                        {payment.transactionId}
+                        {payment.status === "Completed" ? payment.transactionId || "-" : "-"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
+                        {payment.status === "Completed" && (
                         <Button
                           onClick={() => setSelectedInvoice({
                             transactionId: payment.transactionId,
@@ -246,6 +238,7 @@ export default function PaymentHistoryPage() {
                           <Eye className="w-4 h-4" />
                           View Invoice
                         </Button>
+                        )}
                       </td>
                     </tr>
                   ))}
