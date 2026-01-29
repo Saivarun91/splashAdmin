@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { X, Download, Loader2, FileText, Printer } from "lucide-react";
-import { invoiceAPI } from "@/lib/api";
+import { invoiceAPI, organizationAPI } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 
 export function InvoiceView({ transactionId, onClose, paymentData }) {
@@ -10,6 +10,7 @@ export function InvoiceView({ transactionId, onClose, paymentData }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [downloading, setDownloading] = useState(false);
+    const [organizationData, setOrganizationData] = useState(null);
     const [invoiceConfig, setInvoiceConfig] = useState({
         company_name: "Splash Ai Studio",
         invoice_prefix: "INV-",
@@ -19,8 +20,6 @@ export function InvoiceView({ transactionId, onClose, paymentData }) {
         account_number: "123-456-7890",
         pay_by_date: 30,
         terms_and_conditions: "Late payments may result in a 2% penalty fee.",
-        default_client_address: "123 Anywhere St., Any City",
-        default_client_phone: "+123-456-7890",
     });
     const invoiceRef = useRef(null);
 
@@ -28,14 +27,27 @@ export function InvoiceView({ transactionId, onClose, paymentData }) {
         if (transactionId) {
             fetchInvoice();
             fetchInvoiceConfig();
+            fetchOrganizationData();
         }
     }, [transactionId]);
+
+    const fetchOrganizationData = async () => {
+        try {
+            const orgId = localStorage.getItem("org_organization_id");
+            if (orgId) {
+                const data = await organizationAPI.getOrganization(orgId);
+                setOrganizationData(data);
+            }
+        } catch (err) {
+            console.warn("Error fetching organization data:", err.message);
+        }
+    };
 
     const fetchInvoice = async () => {
         try {
             setLoading(true);
             setError(null);
-            const data = await invoiceAPI.getInvoice(transactionId);
+            const data = await invoiceAPI.getInvoice(invoiceData?.id);
             setInvoice(data);
         } catch (err) {
             console.warn("Invoice endpoint not available, using payment data:", err.message);
@@ -116,11 +128,21 @@ export function InvoiceView({ transactionId, onClose, paymentData }) {
     const config = invoiceConfig || {};
     
     // Calculate amounts
-    const subtotal = invoiceData?.amount || 0;
-    const taxRate = config.tax_rate || 18;
-    const tax = (subtotal * taxRate) / 100;
-    const total = subtotal + tax;
-
+    // Prefer server-calculated tax breakdown if available
+    const baseAmount = invoiceData?.amount || invoiceData?.base_amount || 0;
+    const taxRate = (invoiceData?.tax_rate ?? config.tax_rate) || 18;
+    const tax = invoiceData?.tax_amount ?? (baseAmount * taxRate) / 100;
+    const total = invoiceData?.total_amount ?? (baseAmount + tax);
+    const name=invoiceData?.billing_name || invoiceData?.client_name || invoiceData?.organization_name || invoiceData?.organization?.name || "Organization Name";
+    const address=invoiceData?.billing_address || invoiceData?.client_address || invoiceData?.organization_address || invoiceData?.organization?.address || "123 Anywhere St., Any City";
+    const phone=invoiceData?.billing_phone || invoiceData?.client_phone || invoiceData?.organization_phone || invoiceData?.organization?.phone || invoiceData?.organization?.phone_number || "+123-456-7890";
+    const email=invoiceData?.billing_email || invoiceData?.client_email || invoiceData?.organization_email || invoiceData?.organization?.email || "example@example.com";
+    const gstNumber=invoiceData?.billing_gst_number || invoiceData?.client_gst_number || invoiceData?.organization_gst_number || invoiceData?.organization?.gst_number || "1234567890";
+    const billingType=invoiceData?.billing_type || invoiceData?.client_billing_type || invoiceData?.organization_billing_type || invoiceData?.organization?.billing_type || "Business";
+    const billingDetails=invoiceData?.billing_details || invoiceData?.client_billing_details || invoiceData?.organization_billing_details || invoiceData?.organization?.billing_details || "Billing Details";
+    const orderSummary=invoiceData?.order_summary || invoiceData?.client_order_summary || invoiceData?.organization_order_summary || invoiceData?.organization?.order_summary || "Order Summary";   
+    
+    console.log("invoiceData", invoiceData);
     // Format date
     const formatDate = (dateString) => {
         if (!dateString) return new Date().toLocaleDateString('en-GB');
@@ -221,7 +243,7 @@ export function InvoiceView({ transactionId, onClose, paymentData }) {
 
                             <div style={styles.invoiceTitle}>
                                 <h1 style={styles.invoiceText}>INVOICE</h1>
-                                <p><strong>Invoice #</strong> {invoiceNumber}</p>
+                                <p><strong>Invoice #</strong> {invoiceData?.invoice_number || config.invoice_prefix + (invoiceData?.id || transactionId || '00000')}</p>
                                 <p><strong>Date:</strong> {invoiceDate}</p>
                             </div>
                         </div>
@@ -230,11 +252,9 @@ export function InvoiceView({ transactionId, onClose, paymentData }) {
 
                         <div style={styles.billing}>
                             <h4>Billed to:</h4>
-                            <p>{invoiceData.client_name || (invoiceData.is_single_user || invoiceData.isSingleUser 
-                                ? (invoiceData.user_name || invoiceData.user_email || "Individual User")
-                                : (invoiceData.organization || invoiceData.organization_name || "Organization Name"))}</p>
-                            <p>{invoiceData.client_address || invoiceData.organization_address || invoiceData.organization?.address || "123 Anywhere St., Any City"}</p>
-                            <p>{invoiceData.client_phone || invoiceData.organization_phone || invoiceData.organization?.phone || invoiceData.organization?.phone_number || "+123-456-7890"}</p>
+                            <p>{name}</p>
+                            <p>{address}</p>
+                            <p>{phone}</p>
                         </div>
 
                         <table style={styles.table}>
@@ -248,10 +268,10 @@ export function InvoiceView({ transactionId, onClose, paymentData }) {
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td style={styles.td}>{invoiceData.plan || invoiceData.plan_name || "Plan Name"}</td>
+                                    <td style={styles.td}>{invoiceData.plan_name || invoiceData.plan || "Plan Name"}</td>
                                     <td style={styles.td}>1</td>
-                                    <td style={styles.td}>${subtotal.toFixed(2)}</td>
-                                    <td style={styles.td}>${subtotal.toFixed(2)}</td>
+                                    <td style={styles.td}>${baseAmount.toFixed(2)}</td>
+                                    <td style={styles.td}>${baseAmount.toFixed(2)}</td>
                                 </tr>
                                 <tr>
                                     <td style={styles.td}>Gst</td>
