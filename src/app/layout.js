@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 export const metadata = {
   title: "Admin Portal - Dashboard",
   description: "Admin portal for managing organizations, subscriptions, and analytics",
+  icons: {
+    icon: "/images/logo-splash.png",
+  },
 };
 
 export default function RootLayout({ children }) {

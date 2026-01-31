@@ -35,6 +35,8 @@ export default function CreditsUsagePage() {
     credits_per_image_generation: 2,
     credits_per_regeneration: 1,
     default_image_model_name: 'gemini-3-pro-image-preview',
+    credit_reminder_threshold_1: 20,
+    credit_reminder_threshold_2: 10,
   });
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -79,9 +81,11 @@ export default function CreditsUsagePage() {
         // Process settings data
         if (settingsData.success && settingsData.settings) {
           setCreditSettings({
-            credits_per_image_generation: settingsData.settings.credits_per_image_generation || 2,
-            credits_per_regeneration: settingsData.settings.credits_per_regeneration || 1,
+            credits_per_image_generation: settingsData.settings.credits_per_image_generation ?? 2,
+            credits_per_regeneration: settingsData.settings.credits_per_regeneration ?? 1,
             default_image_model_name: settingsData.settings.default_image_model_name || 'gemini-3-pro-image-preview',
+            credit_reminder_threshold_1: settingsData.settings.credit_reminder_threshold_1 ?? 20,
+            credit_reminder_threshold_2: settingsData.settings.credit_reminder_threshold_2 ?? 10,
           });
         }
         setError(null);
@@ -547,6 +551,44 @@ export default function CreditsUsagePage() {
                   </select>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Global Gemini model used for background removal, model shots, and campaign images.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Credit reminder threshold 1
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={creditSettings.credit_reminder_threshold_1 ?? 20}
+                    onChange={(e) => setCreditSettings({
+                      ...creditSettings,
+                      credit_reminder_threshold_1: parseInt(e.target.value, 10) || 0,
+                    })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Send &quot;credits running low&quot; email when balance is at or below this (e.g. 20).
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Credit reminder threshold 2
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={creditSettings.credit_reminder_threshold_2 ?? 10}
+                    onChange={(e) => setCreditSettings({
+                      ...creditSettings,
+                      credit_reminder_threshold_2: parseInt(e.target.value, 10) || 0,
+                    })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Second reminder when balance is at or below this (e.g. 10).
                   </p>
                 </div>
 
