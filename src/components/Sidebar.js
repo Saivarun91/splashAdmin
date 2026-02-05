@@ -13,7 +13,10 @@ import {
   Mail,
   Settings,
   Menu,
-  X
+  X,
+  Home,
+  ChevronRight,
+  ChevronDown
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { authAPI } from '@/lib/api';
@@ -27,7 +30,9 @@ const allMenuItems = [
   // { name: 'Image Generation History', href: '/dashboard/image-generation-history', icon: ImageIcon },
   { name: 'Prompt Master', href: '/dashboard/prompt-master', icon: FileText },
   { name: 'Mail Templates', href: '/dashboard/mail-templates', icon: Mail },
+  { name: 'Home Page', href: '/dashboard/home-page', icon: Home, hasSubmenu: true },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+  { name: 'Legal Compliance', href: '/dashboard/legal-compliance', icon: FileText },
 ];
 
 export default function Sidebar() {
@@ -36,6 +41,14 @@ export default function Sidebar() {
   // Start with subscriptions hidden by default (safer - will show if user has no organization)
   const [menuItems, setMenuItems] = useState(allMenuItems.filter(item => item.name !== 'Subscriptions'));
   const [loading, setLoading] = useState(true);
+  const [expandedMenus, setExpandedMenus] = useState(() => {
+    // Auto-expand Home Page menu if we're on a home page route
+    const initial = {};
+    if (typeof window !== 'undefined' && window.location.pathname?.startsWith('/dashboard/home-page')) {
+      initial['/dashboard/home-page'] = true;
+    }
+    return initial;
+  });
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -110,7 +123,12 @@ export default function Sidebar() {
     };
 
     fetchUserProfile();
-  }, []);
+    
+    // Auto-expand Home Page menu if we're on a home page route
+    if (pathname?.startsWith('/dashboard/home-page')) {
+      setExpandedMenus(prev => ({ ...prev, '/dashboard/home-page': true }));
+    }
+  }, [pathname]);
 
   return (
     <>
@@ -148,7 +166,52 @@ export default function Sidebar() {
           <nav className="flex-1 overflow-y-auto p-4 space-y-2">
             {menuItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href;
+              const isActive = pathname === item.href || (item.hasSubmenu && pathname?.startsWith(item.href));
+              const isExpanded = expandedMenus[item.href] || false;
+              
+              if (item.hasSubmenu && item.name === 'Home Page') {
+                return (
+                  <div key={item.href}>
+                    <button
+                      onClick={() => {
+                        setExpandedMenus(prev => ({ ...prev, [item.href]: !prev[item.href] }));
+                      }}
+                      className={`
+                        w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg transition-all duration-200
+                        ${
+                          isActive
+                            ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold shadow-sm border-l-4 border-blue-600 dark:border-blue-400'
+                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:translate-x-1'
+                        }
+                      `}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Icon size={20} />
+                        <span>{item.name}</span>
+                      </div>
+                      {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    </button>
+                    {isExpanded && (
+                      <div className="ml-4 mt-1 space-y-1">
+                        <Link
+                          href="/dashboard/home-page/before-after"
+                          onClick={() => setIsMobileOpen(false)}
+                          className={`
+                            flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm
+                            ${
+                              pathname === '/dashboard/home-page/before-after'
+                                ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold'
+                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                            }
+                          `}
+                        >
+                          <span className="ml-4">Before After</span>
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
               
               return (
                 <Link

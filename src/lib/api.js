@@ -134,6 +134,63 @@ export const organizationAPI = {
   }),
 };
 
+/**
+ * Legal Compliance API functions
+ * Based on LegalCompliance model from splash_backend/legal/models.py
+ */
+export const legalAPI = {
+  getAll: () => apiRequest('/api/legal/'),
+  update: (contentType, data) => apiRequest(`/api/legal/${contentType}/update/`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
+};
+
+/**
+ * Homepage API functions
+ * For managing homepage content (Before/After images)
+ */
+export const homepageAPI = {
+  // Public: Get all active before/after images
+  getBeforeAfterImages: () => apiRequest('/api/homepage/before-after/'),
+  
+  // Admin: Get all before/after images (including inactive)
+  getAllBeforeAfterImages: () => apiRequest('/api/homepage/before-after/all/'),
+  
+  // Admin: Upload before/after images
+  uploadBeforeAfterImages: async (beforeFile, afterFile) => {
+    const formData = new FormData();
+    formData.append('before_image', beforeFile);
+    formData.append('after_image', afterFile);
+    
+    const url = `${API_BASE_URL}/api/homepage/before-after/upload/`;
+    const token = typeof window !== 'undefined' ? (localStorage.getItem('auth_token') || localStorage.getItem('token')) : null;
+    
+    const config = {
+      method: 'POST',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      body: formData,
+    };
+    
+    const response = await fetch(url, config);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || errorData.message || `API Error: ${response.statusText}`);
+    }
+    return await response.json();
+  },
+  
+  // Admin: Update before/after image
+  updateBeforeAfterImage: (imageId, data) => apiRequest(`/api/homepage/before-after/${imageId}/update/`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
+  
+  // Admin: Delete before/after image
+  deleteBeforeAfterImage: (imageId) => apiRequest(`/api/homepage/before-after/${imageId}/delete/`, {
+    method: 'DELETE'
+  }),
+};
 
 /**
  * Subscription/Plan API functions
