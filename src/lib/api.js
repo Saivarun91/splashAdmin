@@ -5,45 +5,129 @@
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 
+// Global variables to track refresh state
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
 /**
- * Generic API fetch function
+ * Generic API fetch function with auto-refresh mechanism
  */
 async function apiRequest(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
-  const config = {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-    ...options,
+
+  // Clone headers to avoid mutation issues
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
   };
 
   // Add authentication token if available
-  // Backend uses JWT Bearer token authentication
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      headers.Authorization = `Bearer ${token}`;
     }
   }
 
+  const config = {
+    ...options,
+    headers,
+  };
+
   try {
     const response = await fetch(url, config);
-    
-    // Handle 401 Unauthorized - token expired or invalid
+
+    // Handle 401 Unauthorized - token expired
     if (response.status === 401) {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('token');
-        window.location.href = '/';
+      // Prevent infinite loops if the refresh endpoint itself returns 401
+      if (endpoint === '/api/token/refresh/') {
+        throw new Error('Refresh token expired');
       }
-      throw new Error('Authentication failed. Please login again.');
+
+      if (typeof window !== 'undefined') {
+        const refreshToken = localStorage.getItem('refresh_token');
+
+        if (!refreshToken) {
+          // No refresh token, force logout
+          handleLogout();
+          throw new Error('Authentication failed. No refresh token.');
+        }
+
+        if (isRefreshing) {
+          // If already refreshing, queue this request
+          return new Promise((resolve, reject) => {
+            failedQueue.push({ resolve, reject });
+          }).then(token => {
+            config.headers.Authorization = `Bearer ${token}`;
+            return fetch(url, config).then(res => res.json());
+          }).catch(err => {
+            return Promise.reject(err);
+          });
+        }
+
+        isRefreshing = true;
+
+        try {
+          // Verify with backend refresh endpoint
+          const refreshResponse = await fetch(`${API_BASE_URL}/api/token/refresh/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ refresh: refreshToken }),
+          });
+
+          if (!refreshResponse.ok) {
+            throw new Error('Refresh failed');
+          }
+
+          const refreshData = await refreshResponse.json();
+          const newAccessToken = refreshData.access;
+
+          localStorage.setItem('auth_token', newAccessToken);
+          // If backend rotates refresh token
+          if (refreshData.refresh) {
+            localStorage.setItem('refresh_token', refreshData.refresh);
+          }
+
+          isRefreshing = false;
+          processQueue(null, newAccessToken);
+
+          // Retry original request
+          config.headers.Authorization = `Bearer ${newAccessToken}`;
+          const retryResponse = await fetch(url, config);
+          return await retryResponse.json();
+
+        } catch (refreshError) {
+          isRefreshing = false;
+          processQueue(refreshError, null);
+          handleLogout();
+          throw new Error('Session expired. Please login again.');
+        }
+      }
     }
-    
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.error || errorData.message || `API Error: ${response.statusText}`);
     }
+
+    // For 204 No Content
+    if (response.status === 204) {
+      return null;
+    }
+
     return await response.json();
   } catch (error) {
     console.error('API Request failed:', error);
@@ -51,13 +135,44 @@ async function apiRequest(endpoint, options = {}) {
   }
 }
 
+function handleLogout() {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('token');
+    localStorage.removeItem('refresh_token');
+    window.location.href = '/';
+  }
+}
+
 /**
  * Authentication API functions
  */
 export const authAPI = {
-  login: (email, password) => apiRequest('/api/login/', {
+  login: async (email, password) => {
+    const tokenData = await apiRequest('/api/token/', {
+      method: 'POST',
+      body: JSON.stringify({ email, password })
+    });
+
+    if (tokenData && tokenData.access) {
+      // Manually call getProfile with the new token
+      // We can't use authAPI.getProfile() easily here because it relies on apiRequest which relies on localStorage
+      // So we manually pass the header to apiRequest for the profile call
+      const userProfile = await apiRequest('/api/profile/', {
+        headers: { Authorization: `Bearer ${tokenData.access}` }
+      });
+
+      return {
+        token: tokenData.access,
+        refresh: tokenData.refresh,
+        user: userProfile
+      };
+    }
+    return tokenData;
+  },
+  refreshToken: (refresh) => apiRequest('/api/token/refresh/', {
     method: 'POST',
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({ refresh })
   }),
   register: (data) => apiRequest('/api/register/', {
     method: 'POST',
@@ -104,17 +219,17 @@ export const dashboardAPI = {
 export const organizationAPI = {
   getAll: () => apiRequest('/api/organizations/list/'),
   getById: (id) => apiRequest(`/api/organizations/${id}/`),
-  create: (data) => apiRequest('/api/organizations/create/', { 
-    method: 'POST', 
-    body: JSON.stringify(data) 
+  create: (data) => apiRequest('/api/organizations/create/', {
+    method: 'POST',
+    body: JSON.stringify(data)
   }),
   update: (id, data) =>
-    apiRequest(`/api/organizations/${id}/update/`, { 
-      method: 'PUT', 
-      body: JSON.stringify(data) 
+    apiRequest(`/api/organizations/${id}/update/`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
     }),
-  delete: (id) => apiRequest(`/api/organizations/${id}/delete/`, { 
-    method: 'DELETE' 
+  delete: (id) => apiRequest(`/api/organizations/${id}/delete/`, {
+    method: 'DELETE'
   }),
   addCredits: (id, amount, reason) => apiRequest(`/api/organizations/${id}/add-credits/`, {
     method: 'POST',
@@ -153,25 +268,25 @@ export const legalAPI = {
 export const homepageAPI = {
   // Public: Get all active before/after images
   getBeforeAfterImages: () => apiRequest('/api/homepage/before-after/'),
-  
+
   // Admin: Get all before/after images (including inactive)
   getAllBeforeAfterImages: () => apiRequest('/api/homepage/before-after/all/'),
-  
+
   // Admin: Upload before/after images
   uploadBeforeAfterImages: async (beforeFile, afterFile) => {
     const formData = new FormData();
     formData.append('before_image', beforeFile);
     formData.append('after_image', afterFile);
-    
+
     const url = `${API_BASE_URL}/api/homepage/before-after/upload/`;
     const token = typeof window !== 'undefined' ? (localStorage.getItem('auth_token') || localStorage.getItem('token')) : null;
-    
+
     const config = {
       method: 'POST',
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       body: formData,
     };
-    
+
     const response = await fetch(url, config);
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -179,17 +294,26 @@ export const homepageAPI = {
     }
     return await response.json();
   },
-  
+
   // Admin: Update before/after image
   updateBeforeAfterImage: (imageId, data) => apiRequest(`/api/homepage/before-after/${imageId}/update/`, {
     method: 'PUT',
     body: JSON.stringify(data)
   }),
-  
+
   // Admin: Delete before/after image
   deleteBeforeAfterImage: (imageId) => apiRequest(`/api/homepage/before-after/${imageId}/delete/`, {
     method: 'DELETE'
   }),
+
+  // Admin: Get all support/contact requests
+  getAllSupportRequests: (type) => {
+    let url = '/api/homepage/support/all/';
+    if (type) {
+      url += `?type=${type}`;
+    }
+    return apiRequest(url);
+  },
 };
 
 /**
@@ -205,9 +329,9 @@ export const subscriptionAPI = {
     body: JSON.stringify(data)
   }),
   update: (id, data) =>
-    apiRequest(`/api/plans/${id}/update/`, { 
-      method: 'PUT', 
-      body: JSON.stringify(data) 
+    apiRequest(`/api/plans/${id}/update/`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
     }),
   delete: (id) => apiRequest(`/api/plans/${id}/delete/`, {
     method: 'DELETE'
@@ -269,6 +393,7 @@ export const paymentAPI = {
   getById: (id) => apiRequest(`/probackendapp/api/admin/payments/${id}`),
   getRevenue: () => apiRequest('/api/payments/admin/revenue/'),
   getHistory: (organizationId) => apiRequest(`/api/payments/history/?organization_id=${organizationId}`),
+  getSalesLeads: () => apiRequest('/api/payments/admin/leads/'),
 };
 
 /**
@@ -286,7 +411,7 @@ export const invoiceAPI = {
   downloadInvoice: (transactionId) => {
     const url = `${API_BASE_URL}/api/invoices/${transactionId}/download/`;
     const token = typeof window !== "undefined" ? (localStorage.getItem("auth_token") || localStorage.getItem("token")) : null;
-    
+
     return fetch(url, {
       headers: {
         Authorization: token ? `Bearer ${token}` : "",
@@ -328,7 +453,7 @@ export const creditsAPI = {
     const queryString = new URLSearchParams(params).toString();
     return apiRequest(`/api/credits/organization/${orgId}/usage/?${queryString}`);
   },
-  getOrganizationSummary: (orgId) => 
+  getOrganizationSummary: (orgId) =>
     apiRequest(`/api/credits/organization/${orgId}/summary/`),
   getUsageStatistics: (timeRange = 'month', periodCount = 6) => {
     return apiRequest(`/api/credits/admin/usage-statistics/?time_range=${timeRange}&period_count=${periodCount}`);
@@ -367,20 +492,20 @@ export const imageHistoryAPI = {
 export const promptAPI = {
   getAll: () => apiRequest('/probackendapp/api/prompts/'),
   getById: (id) => apiRequest(`/probackendapp/api/prompts/${id}/`),
-  create: (data) => apiRequest('/probackendapp/api/prompts/create/', { 
-    method: 'POST', 
-    body: JSON.stringify(data) 
+  create: (data) => apiRequest('/probackendapp/api/prompts/create/', {
+    method: 'POST',
+    body: JSON.stringify(data)
   }),
   update: (id, data) =>
-    apiRequest(`/probackendapp/api/prompts/${id}/update/`, { 
-      method: 'PUT', 
-      body: JSON.stringify(data) 
+    apiRequest(`/probackendapp/api/prompts/${id}/update/`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
     }),
-  delete: (id) => apiRequest(`/probackendapp/api/prompts/${id}/`, { 
-    method: 'DELETE' 
+  delete: (id) => apiRequest(`/probackendapp/api/prompts/${id}/`, {
+    method: 'DELETE'
   }),
-  initialize: () => apiRequest('/probackendapp/api/prompts/initialize/', { 
-    method: 'POST' 
+  initialize: () => apiRequest('/probackendapp/api/prompts/initialize/', {
+    method: 'POST'
   }),
 };
 
@@ -391,16 +516,16 @@ export const promptAPI = {
 export const projectAPI = {
   getAll: () => apiRequest('/probackendapp/api/projects/'),
   getById: (id) => apiRequest(`/probackendapp/api/projects/${id}/`),
-  create: (data) => apiRequest('/probackendapp/api/projects/create/', { 
-    method: 'POST', 
-    body: JSON.stringify(data) 
+  create: (data) => apiRequest('/probackendapp/api/projects/create/', {
+    method: 'POST',
+    body: JSON.stringify(data)
   }),
-  update: (id, data) => apiRequest(`/probackendapp/api/projects/${id}/update/`, { 
-    method: 'PUT', 
-    body: JSON.stringify(data) 
+  update: (id, data) => apiRequest(`/probackendapp/api/projects/${id}/update/`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
   }),
-  delete: (id) => apiRequest(`/probackendapp/api/projects/${id}/delete/`, { 
-    method: 'DELETE' 
+  delete: (id) => apiRequest(`/probackendapp/api/projects/${id}/delete/`, {
+    method: 'DELETE'
   }),
 };
 

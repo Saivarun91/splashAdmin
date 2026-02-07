@@ -20,9 +20,12 @@ export default function LoginPage() {
     try {
       const { authAPI } = await import('@/lib/api');
       const data = await authAPI.login(email, password);
-      
+
       if (data.token) {
         localStorage.setItem('auth_token', data.token);
+        if (data.refresh) {
+          localStorage.setItem('refresh_token', data.refresh);
+        }
         if (data.user) {
           localStorage.setItem('user_email', data.user.email);
           localStorage.setItem('user_id', data.user.id);
