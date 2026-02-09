@@ -190,6 +190,49 @@ export const homepageAPI = {
   deleteBeforeAfterImage: (imageId) => apiRequest(`/api/homepage/before-after/${imageId}/delete/`, {
     method: 'DELETE'
   }),
+
+  // Page content (CMS): home, about, vision_mission, tutorials, security
+  getPageContent: (slug) => apiRequest(`/api/homepage/content/${slug}/`),
+  getPageContentAdmin: (slug) => apiRequest(`/api/homepage/content/${slug}/admin/`),
+  updatePageContent: (slug, content) => apiRequest(`/api/homepage/content/${slug}/admin/update/`, {
+    method: 'PUT',
+    body: JSON.stringify({ content })
+  }),
+
+  // Blog (public - for reference; admin uses below)
+  getBlogPosts: () => apiRequest('/api/homepage/blog/'),
+  getBlogPost: (slug) => apiRequest(`/api/homepage/blog/${slug}/`),
+  // Blog (admin)
+  getAllBlogPosts: () => apiRequest('/api/homepage/blog/admin/all/'),
+  createBlogPost: (data) => apiRequest('/api/homepage/blog/admin/create/', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+  updateBlogPost: (slug, data) => apiRequest(`/api/homepage/blog/admin/${slug}/update/`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
+  deleteBlogPost: (slug) => apiRequest(`/api/homepage/blog/admin/${slug}/delete/`, {
+    method: 'DELETE'
+  }),
+
+  // Admin: Upload content image (returns { url })
+  uploadContentImage: async (file) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    const url = `${API_BASE_URL}/api/homepage/upload-image/`;
+    const token = typeof window !== 'undefined' ? (localStorage.getItem('auth_token') || localStorage.getItem('token')) : null;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      body: formData,
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Upload failed');
+    }
+    return response.json();
+  },
 };
 
 /**
