@@ -16,7 +16,9 @@ import {
   X,
   Home,
   ChevronRight,
-  ChevronDown
+  ChevronDown,
+  MessageSquare,
+  Users
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { authAPI } from '@/lib/api';
@@ -33,6 +35,8 @@ const allMenuItems = [
   { name: 'Home Page', href: '/dashboard/home-page', icon: Home, hasSubmenu: true },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
   { name: 'Legal Compliance', href: '/dashboard/legal-compliance', icon: FileText },
+  { name: 'Support & Contact', href: '/dashboard/support', icon: MessageSquare },
+  { name: 'Lead Generation', href: '/dashboard/lead-generation', icon: Users },
 ];
 
 export default function Sidebar() {
@@ -55,16 +59,16 @@ export default function Sidebar() {
       try {
         const response = await authAPI.getProfile();
         console.log('User profile response:', response);
-        
+
         if (response.success && response.user) {
           const user = response.user;
           console.log('User data:', user);
           console.log('User organization:', user.organization);
           console.log('User organization_id:', user.organization_id);
-          
+
           // Check if user belongs to any organization - handle all possible formats
           let belongsToOrganization = false;
-          
+
           // Check organization_id first (most reliable)
           if (user.organization_id && user.organization_id !== null && user.organization_id !== 'null' && user.organization_id !== 'undefined') {
             belongsToOrganization = true;
@@ -84,9 +88,9 @@ export default function Sidebar() {
               belongsToOrganization = true;
             }
           }
-          
+
           console.log('Belongs to organization:', belongsToOrganization);
-          
+
           // Filter menu items based on user role
           // Rule: Hide Subscriptions if user belongs to ANY organization (owner or member)
           // Show Subscriptions ONLY if user does NOT belong to any organization
@@ -103,7 +107,7 @@ export default function Sidebar() {
             }
             return true;
           });
-          
+
           console.log('Filtered menu items:', filteredItems);
           setMenuItems(filteredItems);
         } else {
@@ -123,7 +127,7 @@ export default function Sidebar() {
     };
 
     fetchUserProfile();
-    
+
     // Auto-expand Home Page menu if we're on a home page route
     if (pathname?.startsWith('/dashboard/home-page')) {
       setExpandedMenus(prev => ({ ...prev, '/dashboard/home-page': true }));
@@ -168,7 +172,7 @@ export default function Sidebar() {
               const Icon = item.icon;
               const isActive = pathname === item.href || (item.hasSubmenu && pathname?.startsWith(item.href));
               const isExpanded = expandedMenus[item.href] || false;
-              
+
               if (item.hasSubmenu && item.name === 'Home Page') {
                 return (
                   <div key={item.href}>
@@ -178,10 +182,9 @@ export default function Sidebar() {
                       }}
                       className={`
                         w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg transition-all duration-200
-                        ${
-                          isActive
-                            ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold shadow-sm border-l-4 border-blue-600 dark:border-blue-400'
-                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:translate-x-1'
+                        ${isActive
+                          ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold shadow-sm border-l-4 border-blue-600 dark:border-blue-400'
+                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:translate-x-1'
                         }
                       `}
                     >
@@ -193,7 +196,17 @@ export default function Sidebar() {
                     </button>
                     {isExpanded && (
                       <div className="ml-4 mt-1 space-y-1">
-                        <Link href="/dashboard/home-page/before-after" onClick={() => setIsMobileOpen(false)} className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm ${pathname === '/dashboard/home-page/before-after' ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+                        <Link
+                          href="/dashboard/home-page/before-after"
+                          onClick={() => setIsMobileOpen(false)}
+                          className={`
+                            flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm
+                            ${pathname === '/dashboard/home-page/before-after'
+                              ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold'
+                              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                            }
+                          `}
+                        >
                           <span className="ml-4">Before After</span>
                         </Link>
                         <Link href="/dashboard/home-page/hero" onClick={() => setIsMobileOpen(false)} className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm ${pathname === '/dashboard/home-page/hero' ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
@@ -222,7 +235,7 @@ export default function Sidebar() {
                   </div>
                 );
               }
-              
+
               return (
                 <Link
                   key={item.href}
@@ -230,10 +243,9 @@ export default function Sidebar() {
                   onClick={() => setIsMobileOpen(false)}
                   className={`
                     flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200
-                    ${
-                      isActive
-                        ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold shadow-sm border-l-4 border-blue-600 dark:border-blue-400'
-                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:translate-x-1'
+                    ${isActive
+                      ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold shadow-sm border-l-4 border-blue-600 dark:border-blue-400'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:translate-x-1'
                     }
                   `}
                 >
