@@ -120,7 +120,12 @@ async function apiRequest(endpoint, options = {}) {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || errorData.message || `API Error: ${response.statusText}`);
+      const errMsg = errorData.error || errorData.message || `API Error: ${response.statusText}`;
+      const err = new Error(errMsg);
+      if (isTokenRelatedError({ message: errMsg })) {
+        handleTokenError();
+      }
+      throw err;
     }
 
     // For 204 No Content
@@ -130,6 +135,9 @@ async function apiRequest(endpoint, options = {}) {
 
     return await response.json();
   } catch (error) {
+    if (isTokenRelatedError(error)) {
+      handleTokenError();
+    }
     console.error('API Request failed:', error);
     throw error;
   }
@@ -288,6 +296,10 @@ export const homepageAPI = {
     };
 
     const response = await fetch(url, config);
+    if (response.status === 401) {
+      handleTokenError();
+      throw new Error('Authentication failed. Please login again.');
+    }
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.error || errorData.message || `API Error: ${response.statusText}`);
@@ -342,6 +354,10 @@ export const homepageAPI = {
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       body: formData,
     });
+    if (response.status === 401) {
+      handleTokenError();
+      throw new Error('Authentication failed. Please login again.');
+    }
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
       throw new Error(err.error || 'Upload failed');
@@ -451,6 +467,10 @@ export const invoiceAPI = {
         Authorization: token ? `Bearer ${token}` : "",
       },
     }).then((response) => {
+      if (response.status === 401) {
+        handleTokenError();
+        throw new Error("Authentication failed. Please login again.");
+      }
       if (!response.ok) throw new Error("Failed to download invoice");
       return response.blob();
     });
