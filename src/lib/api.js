@@ -5,6 +5,32 @@
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 
+const ADMIN_LOGIN_PATH = '/';
+
+/**
+ * On any token/authentication error: clear auth state and redirect to login.
+ * Use for 401, invalid token, expired token, or any token-related API error.
+ */
+function handleTokenError() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('token');
+  window.location.href = ADMIN_LOGIN_PATH;
+}
+
+function isTokenRelatedError(error) {
+  if (!error?.message) return false;
+  const msg = String(error.message).toLowerCase();
+  return (
+    msg.includes('token') ||
+    msg.includes('401') ||
+    msg.includes('unauthorized') ||
+    msg.includes('authentication') ||
+    msg.includes('expired') ||
+    msg.includes('invalid credentials')
+  );
+}
+
 /**
  * Generic API fetch function
  */
@@ -29,23 +55,27 @@ async function apiRequest(endpoint, options = {}) {
 
   try {
     const response = await fetch(url, config);
-    
-    // Handle 401 Unauthorized - token expired or invalid
+
+    // Handle 401 or any token-related response
     if (response.status === 401) {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('token');
-        window.location.href = '/';
-      }
+      handleTokenError();
       throw new Error('Authentication failed. Please login again.');
     }
-    
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || errorData.message || `API Error: ${response.statusText}`);
+      const errMsg = errorData.error || errorData.message || `API Error: ${response.statusText}`;
+      const err = new Error(errMsg);
+      if (isTokenRelatedError({ message: errMsg })) {
+        handleTokenError();
+      }
+      throw err;
     }
     return await response.json();
   } catch (error) {
+    if (isTokenRelatedError(error)) {
+      handleTokenError();
+    }
     console.error('API Request failed:', error);
     throw error;
   }
@@ -173,13 +203,17 @@ export const homepageAPI = {
     };
     
     const response = await fetch(url, config);
+    if (response.status === 401) {
+      handleTokenError();
+      throw new Error('Authentication failed. Please login again.');
+    }
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.error || errorData.message || `API Error: ${response.statusText}`);
     }
     return await response.json();
   },
-  
+
   // Admin: Update before/after image
   updateBeforeAfterImage: (imageId, data) => apiRequest(`/api/homepage/before-after/${imageId}/update/`, {
     method: 'PUT',
@@ -227,6 +261,10 @@ export const homepageAPI = {
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       body: formData,
     });
+    if (response.status === 401) {
+      handleTokenError();
+      throw new Error('Authentication failed. Please login again.');
+    }
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
       throw new Error(err.error || 'Upload failed');
@@ -335,6 +373,10 @@ export const invoiceAPI = {
         Authorization: token ? `Bearer ${token}` : "",
       },
     }).then((response) => {
+      if (response.status === 401) {
+        handleTokenError();
+        throw new Error("Authentication failed. Please login again.");
+      }
       if (!response.ok) throw new Error("Failed to download invoice");
       return response.blob();
     });
