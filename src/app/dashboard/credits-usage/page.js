@@ -18,6 +18,14 @@ import { Coins, TrendingUp, TrendingDown, Activity, Zap, Download, Filter, X, Ca
 import { useState, useEffect } from 'react';
 import { creditsAPI } from '@/lib/api';
 
+const DEFAULT_MODEL_OPTIONS = [
+  'imagen-3.0-generate-001',
+];
+const DEFAULT_TEXT_FLASH_MODEL = 'gemini-1.5-flash';
+const DEFAULT_TEXT_PRO_MODEL = 'gemini-1.5-pro';
+
+const CUSTOM_MODELS_STORAGE_KEY = 'credits_usage_custom_models';
+
 export default function CreditsUsagePage() {
   const [timeRange, setTimeRange] = useState('month');
   const [loading, setLoading] = useState(true);
@@ -34,7 +42,9 @@ export default function CreditsUsagePage() {
   const [creditSettings, setCreditSettings] = useState({
     credits_per_image_generation: 2,
     credits_per_regeneration: 1,
-    default_image_model_name: 'gemini-3-pro-image-preview',
+    default_image_model_name: 'imagen-3.0-generate-001',
+    default_text_model_flash: DEFAULT_TEXT_FLASH_MODEL,
+    default_text_model_pro: DEFAULT_TEXT_PRO_MODEL,
     credit_reminder_threshold_1: 20,
     credit_reminder_threshold_2: 10,
   });
@@ -44,6 +54,51 @@ export default function CreditsUsagePage() {
   const [error, setError] = useState(null);
   const [monthlyUsage, setMonthlyUsage] = useState([]);
   const [chartLoading, setChartLoading] = useState(true);
+  const [modelOptions, setModelOptions] = useState(DEFAULT_MODEL_OPTIONS);
+  const [newModelName, setNewModelName] = useState('');
+
+  const mergeModelOptions = (models = []) => {
+    return Array.from(
+      new Set(
+        [...DEFAULT_MODEL_OPTIONS, ...models]
+          .map((model) => (typeof model === 'string' ? model.trim() : ''))
+          .filter(Boolean)
+      )
+    );
+  };
+
+  const addModelOption = (modelName) => {
+    const trimmedModelName = (modelName || '').trim();
+    if (!trimmedModelName) return;
+
+    setModelOptions((prev) => mergeModelOptions([...prev, trimmedModelName]));
+    setCreditSettings((prev) => ({
+      ...prev,
+      default_image_model_name: trimmedModelName,
+    }));
+    setNewModelName('');
+  };
+
+  useEffect(() => {
+    try {
+      const storedModels = localStorage.getItem(CUSTOM_MODELS_STORAGE_KEY);
+      if (!storedModels) return;
+
+      const parsedModels = JSON.parse(storedModels);
+      if (Array.isArray(parsedModels)) {
+        setModelOptions(mergeModelOptions(parsedModels));
+      }
+    } catch (error) {
+      console.error('Failed to load custom model options:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    const customModels = modelOptions.filter(
+      (model) => !DEFAULT_MODEL_OPTIONS.includes(model)
+    );
+    localStorage.setItem(CUSTOM_MODELS_STORAGE_KEY, JSON.stringify(customModels));
+  }, [modelOptions]);
 
   useEffect(() => {
     // Fetch both API calls in parallel for better performance
@@ -80,10 +135,14 @@ export default function CreditsUsagePage() {
 
         // Process settings data
         if (settingsData.success && settingsData.settings) {
+          const selectedModelName = settingsData.settings.default_image_model_name || 'imagen-3.0-generate-001';
+          setModelOptions((prev) => mergeModelOptions([...prev, selectedModelName]));
           setCreditSettings({
             credits_per_image_generation: settingsData.settings.credits_per_image_generation ?? 2,
             credits_per_regeneration: settingsData.settings.credits_per_regeneration ?? 1,
-            default_image_model_name: settingsData.settings.default_image_model_name || 'gemini-3-pro-image-preview',
+            default_image_model_name: selectedModelName,
+            default_text_model_flash: settingsData.settings.default_text_model_flash ?? DEFAULT_TEXT_FLASH_MODEL,
+            default_text_model_pro: settingsData.settings.default_text_model_pro ?? DEFAULT_TEXT_PRO_MODEL,
             credit_reminder_threshold_1: settingsData.settings.credit_reminder_threshold_1 ?? 20,
             credit_reminder_threshold_2: settingsData.settings.credit_reminder_threshold_2 ?? 10,
           });
@@ -475,7 +534,7 @@ export default function CreditsUsagePage() {
         {/* Settings Modal */}
         {showSettingsModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] flex flex-col">
               <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                   <Settings size={24} />
@@ -489,7 +548,7 @@ export default function CreditsUsagePage() {
                 </button>
               </div>
 
-              <div className="p-6 space-y-6">
+              <div className="p-6 space-y-6 overflow-y-auto">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Credits per Image Generation *
@@ -542,15 +601,74 @@ export default function CreditsUsagePage() {
                     })}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
-                    <option value="gemini-3-pro-image-preview">
-                      Gemini 3 Pro (Image Preview)
-                    </option>
-                    <option value="gemini-2.5-flash-image">
-                      Gemini 2.5 Flash (Image)
-                    </option>
+                    {modelOptions.map((modelName) => (
+                      <option key={modelName} value={modelName}>
+                        {modelName}
+                      </option>
+                    ))}
                   </select>
+                  <div className="mt-3 flex gap-2">
+                    <input
+                      type="text"
+                      value={newModelName}
+                      onChange={(e) => setNewModelName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addModelOption(newModelName);
+                        }
+                      }}
+                      placeholder="Enter new model name"
+                      className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => addModelOption(newModelName)}
+                      className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm font-medium"
+                    >
+                      Add
+                    </button>
+                  </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Global Gemini model used for background removal, model shots, and campaign images.
+                    Choose an existing model or add a new model name. Added models are saved and shown in this dropdown.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Text Model (Flash)
+                  </label>
+                  <input
+                    type="text"
+                    value={creditSettings.default_text_model_flash ?? DEFAULT_TEXT_FLASH_MODEL}
+                    onChange={(e) => setCreditSettings({
+                      ...creditSettings,
+                      default_text_model_flash: e.target.value,
+                    })}
+                    placeholder={DEFAULT_TEXT_FLASH_MODEL}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Used for standard text generation calls.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Text Model (Pro)
+                  </label>
+                  <input
+                    type="text"
+                    value={creditSettings.default_text_model_pro ?? DEFAULT_TEXT_PRO_MODEL}
+                    onChange={(e) => setCreditSettings({
+                      ...creditSettings,
+                      default_text_model_pro: e.target.value,
+                    })}
+                    placeholder={DEFAULT_TEXT_PRO_MODEL}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Used for advanced text/vision analysis calls.
                   </p>
                 </div>
 

@@ -91,7 +91,7 @@ export default function MailTemplatesPage() {
       await creditsAPI.updateSettings({
         credits_per_image_generation: s.credits_per_image_generation ?? 2,
         credits_per_regeneration: s.credits_per_regeneration ?? 1,
-        default_image_model_name: s.default_image_model_name ?? 'gemini-3-pro-image-preview',
+        default_image_model_name: s.default_image_model_name ?? 'imagen-3.0-generate-001',
         credit_reminder_threshold_1: threshold1,
         credit_reminder_threshold_2: threshold2,
       });

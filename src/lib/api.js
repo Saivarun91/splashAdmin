@@ -343,6 +343,9 @@ export const homepageAPI = {
     method: 'DELETE'
   }),
 
+  // Admin: Get all support & contact form requests
+  getAllSupportRequests: () => apiRequest('/api/homepage/support/all/'),
+
   // Admin: Upload content image (returns { url })
   uploadContentImage: async (file) => {
     const formData = new FormData();

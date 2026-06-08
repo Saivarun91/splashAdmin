@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { homepageAPI } from "@/lib/api"; // We'll add this to admin-portal api.js
+import { homepageAPI } from "@/lib/api";
 import { Loader2, Search, Mail, Phone, User, MessageSquare, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
@@ -35,11 +35,13 @@ export default function SupportPage() {
     }, []);
 
     const filteredRequests = requests.filter((req) => {
+        const searchLower = search.toLowerCase();
         const matchesSearch =
-            req.name.toLowerCase().includes(search.toLowerCase()) ||
-            req.email.toLowerCase().includes(search.toLowerCase()) ||
-            req.mobile.includes(search) ||
-            req.reason.toLowerCase().includes(search.toLowerCase());
+            !search ||
+            (req.name && req.name.toLowerCase().includes(searchLower)) ||
+            (req.email && req.email.toLowerCase().includes(searchLower)) ||
+            (req.mobile && String(req.mobile).includes(search)) ||
+            (req.reason && req.reason.toLowerCase().includes(searchLower));
 
         const matchesFilter = filter === "all" || req.type === filter;
 
@@ -127,20 +129,24 @@ export default function SupportPage() {
                                     </div>
                                     <div>
                                         <div className="flex items-center gap-2 mb-1">
-                                            <h3 className="font-semibold text-gray-900">{req.name}</h3>
+                                            <h3 className="font-semibold text-gray-900">{req.name || "—"}</h3>
                                             <Badge variant={req.type === 'support' ? "default" : "secondary"} className={req.type === 'support' ? "bg-indigo-100 text-indigo-700 border-indigo-200" : "bg-orange-100 text-orange-700 border-orange-200"}>
                                                 {req.type === 'support' ? 'Help Center' : 'Contact Form'}
                                             </Badge>
                                         </div>
                                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500">
-                                            <div className="flex items-center gap-1">
-                                                <Mail size={14} />
-                                                {req.email}
-                                            </div>
-                                            <div className="flex items-center gap-1">
-                                                <Phone size={14} />
-                                                {req.mobile}
-                                            </div>
+                                            {req.email && (
+                                                <div className="flex items-center gap-1">
+                                                    <Mail size={14} />
+                                                    {req.email}
+                                                </div>
+                                            )}
+                                            {req.mobile && (
+                                                <div className="flex items-center gap-1">
+                                                    <Phone size={14} />
+                                                    {req.mobile}
+                                                </div>
+                                            )}
                                             {req.created_at && (
                                                 <span className="text-gray-400">• {format(new Date(req.created_at), "PPP p")}</span>
                                             )}
@@ -150,13 +156,15 @@ export default function SupportPage() {
                             </div>
 
                             <div className="mt-3 pl-0 md:pl-14">
-                                <div className="bg-gray-50 rounded-lg p-3 text-gray-700 text-sm whitespace-pre-wrap">
-                                    {req.reason}
-                                </div>
-                                {req.user && (
+                                {(req.reason != null && req.reason !== "") && (
+                                    <div className="bg-gray-50 rounded-lg p-3 text-gray-700 text-sm whitespace-pre-wrap">
+                                        {req.reason}
+                                    </div>
+                                )}
+                                {req.user && (req.user.username || req.user.email) && (
                                     <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
                                         <User size={12} />
-                                        Linked Account: {req.user.username} ({req.user.email})
+                                        Linked Account: {req.user.username || ""} {req.user.email && `(${req.user.email})`}
                                     </div>
                                 )}
                             </div>
