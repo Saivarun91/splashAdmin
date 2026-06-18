@@ -25,7 +25,7 @@ import { authAPI } from '@/lib/api';
 
 const allMenuItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Organization', href: '/dashboard/organization', icon: Building2 },
+  { name: 'User', href: '/dashboard/users', icon: Users, hasSubmenu: true },
   { name: 'Subscriptions', href: '/dashboard/subscriptions', icon: CreditCard },
   { name: 'Payment History', href: '/dashboard/payment-history', icon: History },
   { name: 'Credits Usage', href: '/dashboard/credits-usage', icon: Coins },
@@ -46,10 +46,14 @@ export default function Sidebar() {
   const [menuItems, setMenuItems] = useState(allMenuItems.filter(item => item.name !== 'Subscriptions'));
   const [loading, setLoading] = useState(true);
   const [expandedMenus, setExpandedMenus] = useState(() => {
-    // Auto-expand Home Page menu if we're on a home page route
     const initial = {};
-    if (typeof window !== 'undefined' && window.location.pathname?.startsWith('/dashboard/home-page')) {
-      initial['/dashboard/home-page'] = true;
+    if (typeof window !== 'undefined') {
+      if (window.location.pathname?.startsWith('/dashboard/home-page')) {
+        initial['/dashboard/home-page'] = true;
+      }
+      if (window.location.pathname?.startsWith('/dashboard/organization') || window.location.pathname?.startsWith('/dashboard/users')) {
+        initial['/dashboard/users'] = true;
+      }
     }
     return initial;
   });
@@ -132,6 +136,9 @@ export default function Sidebar() {
     if (pathname?.startsWith('/dashboard/home-page')) {
       setExpandedMenus(prev => ({ ...prev, '/dashboard/home-page': true }));
     }
+    if (pathname?.startsWith('/dashboard/organization') || pathname?.startsWith('/dashboard/users')) {
+      setExpandedMenus(prev => ({ ...prev, '/dashboard/users': true }));
+    }
   }, [pathname]);
 
   return (
@@ -173,6 +180,13 @@ export default function Sidebar() {
               const isActive = pathname === item.href || (item.hasSubmenu && pathname?.startsWith(item.href));
               const isExpanded = expandedMenus[item.href] || false;
 
+              const userMenuActive = item.name === 'User' && (
+                pathname?.startsWith('/dashboard/organization') || pathname?.startsWith('/dashboard/users')
+              );
+              const itemIsActive = item.hasSubmenu
+                ? (item.name === 'User' ? userMenuActive : isActive)
+                : pathname === item.href;
+
               if (item.hasSubmenu && item.name === 'Home Page') {
                 return (
                   <div key={item.href}>
@@ -182,7 +196,7 @@ export default function Sidebar() {
                       }}
                       className={`
                         w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg transition-all duration-200
-                        ${isActive
+                        ${itemIsActive
                           ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold shadow-sm border-l-4 border-blue-600 dark:border-blue-400'
                           : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:translate-x-1'
                         }
@@ -208,6 +222,9 @@ export default function Sidebar() {
                           `}
                         >
                           <span className="ml-4">Before After</span>
+                        </Link>
+                        <Link href="/dashboard/home-page/public-gallery" onClick={() => setIsMobileOpen(false)} className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm ${pathname === '/dashboard/home-page/public-gallery' ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+                          <span className="ml-4">Public Gallery</span>
                         </Link>
                         <Link href="/dashboard/home-page/hero" onClick={() => setIsMobileOpen(false)} className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm ${pathname === '/dashboard/home-page/hero' ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                           <span className="ml-4">Hero & CTA</span>
@@ -236,6 +253,63 @@ export default function Sidebar() {
                 );
               }
 
+              if (item.hasSubmenu && item.name === 'User') {
+                return (
+                  <div key={item.href}>
+                    <button
+                      onClick={() => {
+                        setExpandedMenus(prev => ({ ...prev, [item.href]: !prev[item.href] }));
+                      }}
+                      className={`
+                        w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg transition-all duration-200
+                        ${itemIsActive
+                          ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold shadow-sm border-l-4 border-blue-600 dark:border-blue-400'
+                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:translate-x-1'
+                        }
+                      `}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Icon size={20} />
+                        <span>{item.name}</span>
+                      </div>
+                      {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    </button>
+                    {isExpanded && (
+                      <div className="ml-4 mt-1 space-y-1">
+                        <Link
+                          href="/dashboard/organization"
+                          onClick={() => setIsMobileOpen(false)}
+                          className={`
+                            flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm
+                            ${pathname?.startsWith('/dashboard/organization')
+                              ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold'
+                              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                            }
+                          `}
+                        >
+                          <Building2 size={16} className="ml-4" />
+                          <span>Organization</span>
+                        </Link>
+                        <Link
+                          href="/dashboard/users/individual"
+                          onClick={() => setIsMobileOpen(false)}
+                          className={`
+                            flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm
+                            ${pathname?.startsWith('/dashboard/users/individual')
+                              ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold'
+                              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                            }
+                          `}
+                        >
+                          <Users size={16} className="ml-4" />
+                          <span>Individual User</span>
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               return (
                 <Link
                   key={item.href}
@@ -243,7 +317,7 @@ export default function Sidebar() {
                   onClick={() => setIsMobileOpen(false)}
                   className={`
                     flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200
-                    ${isActive
+                    ${pathname === item.href
                       ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold shadow-sm border-l-4 border-blue-600 dark:border-blue-400'
                       : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:translate-x-1'
                     }

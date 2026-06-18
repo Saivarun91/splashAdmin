@@ -42,6 +42,10 @@ export default function CreditsUsagePage() {
   const [creditSettings, setCreditSettings] = useState({
     credits_per_image_generation: 2,
     credits_per_regeneration: 1,
+    credits_per_regular_generation: 2,
+    credits_per_premium_generation: 2,
+    credits_per_regular_regeneration: 1,
+    credits_per_premium_regeneration: 1,
     default_image_model_name: 'imagen-3.0-generate-001',
     default_text_model_flash: DEFAULT_TEXT_FLASH_MODEL,
     default_text_model_pro: DEFAULT_TEXT_PRO_MODEL,
@@ -140,6 +144,10 @@ export default function CreditsUsagePage() {
           setCreditSettings({
             credits_per_image_generation: settingsData.settings.credits_per_image_generation ?? 2,
             credits_per_regeneration: settingsData.settings.credits_per_regeneration ?? 1,
+            credits_per_regular_generation: settingsData.settings.credits_per_regular_generation ?? settingsData.settings.credits_per_image_generation ?? 2,
+            credits_per_premium_generation: settingsData.settings.credits_per_premium_generation ?? settingsData.settings.credits_per_image_generation ?? 2,
+            credits_per_regular_regeneration: settingsData.settings.credits_per_regular_regeneration ?? settingsData.settings.credits_per_regeneration ?? 1,
+            credits_per_premium_regeneration: settingsData.settings.credits_per_premium_regeneration ?? settingsData.settings.credits_per_regeneration ?? 1,
             default_image_model_name: selectedModelName,
             default_text_model_flash: settingsData.settings.default_text_model_flash ?? DEFAULT_TEXT_FLASH_MODEL,
             default_text_model_pro: settingsData.settings.default_text_model_pro ?? DEFAULT_TEXT_PRO_MODEL,
@@ -414,39 +422,67 @@ export default function CreditsUsagePage() {
             </div>
 
             <div className="space-y-4">
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-                <div className="flex items-center gap-2 mb-2">
-                  <Zap className="text-blue-600 dark:text-blue-400" size={18} />
-                  <p className="text-sm font-medium text-blue-900 dark:text-blue-300">Per Image Generation</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Zap className="text-blue-600 dark:text-blue-400" size={18} />
+                    <p className="text-sm font-medium text-blue-900 dark:text-blue-300">Regular Generation</p>
+                  </div>
+                  {settingsLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                  ) : (
+                    <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                      {creditSettings.credits_per_regular_generation} Credit{creditSettings.credits_per_regular_generation !== 1 ? 's' : ''}
+                    </p>
+                  )}
                 </div>
-                {settingsLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-                ) : (
-                  <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-                    {creditSettings.credits_per_image_generation}{creditSettings.credits_per_image_generation > 1 ? ' Credits' : ' Credit'}
-                  </p>
-                )}
-                <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                  Deducted for each new image generation
-                </p>
+
+                <div className="bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-900/20 dark:to-violet-900/20 rounded-lg p-4 border border-indigo-200 dark:border-indigo-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Zap className="text-indigo-600 dark:text-indigo-400" size={18} />
+                    <p className="text-sm font-medium text-indigo-900 dark:text-indigo-300">Premium Generation</p>
+                  </div>
+                  {settingsLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-indigo-600" />
+                  ) : (
+                    <p className="text-2xl font-bold text-indigo-900 dark:text-indigo-100">
+                      {creditSettings.credits_per_premium_generation} Credit{creditSettings.credits_per_premium_generation !== 1 ? 's' : ''}
+                    </p>
+                  )}
+                </div>
+
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Activity className="text-purple-600 dark:text-purple-400" size={18} />
+                    <p className="text-sm font-medium text-purple-900 dark:text-purple-300">Regular Regeneration</p>
+                  </div>
+                  {settingsLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-purple-600" />
+                  ) : (
+                    <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
+                      {creditSettings.credits_per_regular_regeneration} Credit{creditSettings.credits_per_regular_regeneration !== 1 ? 's' : ''}
+                    </p>
+                  )}
+                </div>
+
+                <div className="bg-gradient-to-r from-pink-50 to-rose-50 dark:from-pink-900/20 dark:to-rose-900/20 rounded-lg p-4 border border-pink-200 dark:border-pink-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Activity className="text-pink-600 dark:text-pink-400" size={18} />
+                    <p className="text-sm font-medium text-pink-900 dark:text-pink-300">Premium Regeneration</p>
+                  </div>
+                  {settingsLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-pink-600" />
+                  ) : (
+                    <p className="text-2xl font-bold text-pink-900 dark:text-pink-100">
+                      {creditSettings.credits_per_premium_regeneration} Credit{creditSettings.credits_per_premium_regeneration !== 1 ? 's' : ''}
+                    </p>
+                  )}
+                </div>
               </div>
 
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
-                <div className="flex items-center gap-2 mb-2">
-                  <Activity className="text-purple-600 dark:text-purple-400" size={18} />
-                  <p className="text-sm font-medium text-purple-900 dark:text-purple-300">Per Regeneration</p>
-                </div>
-                {settingsLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-purple-600" />
-                ) : (
-                    <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
-                      {creditSettings.credits_per_regeneration}{creditSettings.credits_per_regeneration > 1 ? ' Credits' : ' Credit'}
-                  </p>
-                )}
-                <p className="text-xs text-purple-700 dark:text-purple-300 mt-1">
-                  Deducted for each image regeneration
-                </p>
-              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Legacy defaults: {creditSettings.credits_per_image_generation} per generation, {creditSettings.credits_per_regeneration} per regeneration
+              </p>
             </div>
           </div>
 
@@ -551,7 +587,75 @@ export default function CreditsUsagePage() {
               <div className="p-6 space-y-6 overflow-y-auto">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Credits per Image Generation *
+                    Credits per Regular Generation *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={creditSettings.credits_per_regular_generation}
+                    onChange={(e) => setCreditSettings({
+                      ...creditSettings,
+                      credits_per_regular_generation: parseInt(e.target.value) || 0
+                    })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Credits per Premium Generation *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={creditSettings.credits_per_premium_generation}
+                    onChange={(e) => setCreditSettings({
+                      ...creditSettings,
+                      credits_per_premium_generation: parseInt(e.target.value) || 0
+                    })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Credits per Regular Regeneration *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={creditSettings.credits_per_regular_regeneration}
+                    onChange={(e) => setCreditSettings({
+                      ...creditSettings,
+                      credits_per_regular_regeneration: parseInt(e.target.value) || 0
+                    })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Credits per Premium Regeneration *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={creditSettings.credits_per_premium_regeneration}
+                    onChange={(e) => setCreditSettings({
+                      ...creditSettings,
+                      credits_per_premium_regeneration: parseInt(e.target.value) || 0
+                    })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Credits per Image Generation (legacy fallback) *
                   </label>
                   <input
                     type="number"
@@ -571,7 +675,7 @@ export default function CreditsUsagePage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Credits per Regeneration *
+                    Credits per Regeneration (legacy fallback) *
                   </label>
                   <input
                     type="number"

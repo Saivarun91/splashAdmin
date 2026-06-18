@@ -152,6 +152,48 @@ function handleLogout() {
   }
 }
 
+function handleTokenError() {
+  handleLogout();
+}
+
+function isTokenRelatedError(error) {
+  if (!error?.message) return false;
+  const msg = String(error.message).toLowerCase();
+  return (
+    msg.includes('token') ||
+    msg.includes('401') ||
+    msg.includes('unauthorized') ||
+    msg.includes('authentication') ||
+    msg.includes('expired') ||
+    msg.includes('invalid credentials')
+  );
+}
+
+async function uploadMultipart(endpoint, formData) {
+  const url = `${API_BASE_URL}${endpoint}`;
+  const token = typeof window !== 'undefined'
+    ? (localStorage.getItem('auth_token') || localStorage.getItem('token'))
+    : null;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+
+  if (response.status === 401) {
+    handleTokenError();
+    throw new Error('Authentication failed. Please login again.');
+  }
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || errorData.message || `API Error: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
 /**
  * Authentication API functions
  */
@@ -255,6 +297,10 @@ export const organizationAPI = {
   removeUser: (organizationId, userId) => apiRequest(`/api/organizations/${organizationId}/users/${userId}/remove/`, {
     method: 'DELETE'
   }),
+  getImages: (id, params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return apiRequest(`/api/organizations/${id}/images/?${queryString}`);
+  },
 };
 
 /**
@@ -285,26 +331,7 @@ export const homepageAPI = {
     const formData = new FormData();
     formData.append('before_image', beforeFile);
     formData.append('after_image', afterFile);
-
-    const url = `${API_BASE_URL}/api/homepage/before-after/upload/`;
-    const token = typeof window !== 'undefined' ? (localStorage.getItem('auth_token') || localStorage.getItem('token')) : null;
-
-    const config = {
-      method: 'POST',
-      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-      body: formData,
-    };
-
-    const response = await fetch(url, config);
-    if (response.status === 401) {
-      handleTokenError();
-      throw new Error('Authentication failed. Please login again.');
-    }
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || errorData.message || `API Error: ${response.statusText}`);
-    }
-    return await response.json();
+    return uploadMultipart('/api/homepage/before-after/upload/', formData);
   },
 
   // Admin: Update before/after image
@@ -316,6 +343,35 @@ export const homepageAPI = {
   // Admin: Delete before/after image
   deleteBeforeAfterImage: (imageId) => apiRequest(`/api/homepage/before-after/${imageId}/delete/`, {
     method: 'DELETE'
+  }),
+
+  getAllPublicGalleryImages: () => apiRequest('/api/homepage/public-gallery/all/'),
+
+  getPublicGalleryOverview: () => apiRequest('/api/homepage/public-gallery/admin/overview/'),
+
+  importPublicGalleryImages: (payload) => apiRequest('/api/homepage/public-gallery/import/', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }),
+
+  uploadPublicGalleryImage: async (file, fields = {}) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    Object.entries(fields).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        formData.append(key, String(value));
+      }
+    });
+    return uploadMultipart('/api/homepage/public-gallery/upload/', formData);
+  },
+
+  updatePublicGalleryImage: (imageId, data) => apiRequest(`/api/homepage/public-gallery/${imageId}/update/`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+
+  deletePublicGalleryImage: (imageId) => apiRequest(`/api/homepage/public-gallery/${imageId}/delete/`, {
+    method: 'DELETE',
   }),
 
   // Page content (CMS): home, about, vision_mission, tutorials, security
@@ -350,22 +406,7 @@ export const homepageAPI = {
   uploadContentImage: async (file) => {
     const formData = new FormData();
     formData.append('image', file);
-    const url = `${API_BASE_URL}/api/homepage/upload-image/`;
-    const token = typeof window !== 'undefined' ? (localStorage.getItem('auth_token') || localStorage.getItem('token')) : null;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-      body: formData,
-    });
-    if (response.status === 401) {
-      handleTokenError();
-      throw new Error('Authentication failed. Please login again.');
-    }
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || 'Upload failed');
-    }
-    return response.json();
+    return uploadMultipart('/api/homepage/upload-image/', formData);
   },
 };
 
@@ -583,6 +624,26 @@ export const projectAPI = {
   }),
   delete: (id) => apiRequest(`/probackendapp/api/projects/${id}/delete/`, {
     method: 'DELETE'
+  }),
+};
+
+/**
+ * Individual User API functions (admin - users without organization)
+ */
+export const individualUserAPI = {
+  getAll: () => apiRequest('/api/admin/individual/list/'),
+  getById: (id) => apiRequest(`/api/admin/individual/${id}/`),
+  getImages: (id, params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return apiRequest(`/api/admin/individual/${id}/images/?${queryString}`);
+  },
+  addCredits: (id, amount, reason) => apiRequest(`/api/admin/individual/${id}/add-credits/`, {
+    method: 'POST',
+    body: JSON.stringify({ amount, reason })
+  }),
+  removeCredits: (id, amount, reason) => apiRequest(`/api/admin/individual/${id}/remove-credits/`, {
+    method: 'POST',
+    body: JSON.stringify({ amount, reason })
   }),
 };
 

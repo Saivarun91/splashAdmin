@@ -6,7 +6,7 @@ import { ArrowLeft } from 'lucide-react';
 import { OrganizationStats } from '@/components/organization/OrganizationStats';
 import { ProjectsGrid } from '@/components/organization/ProjectsGrid';
 import { ProjectDetailView } from '@/components/organization/ProjectDetailView';
-import { IndividualImagesView } from '@/components/organization/image-analysis/IndividualImagesView';
+import { GeneratedImagesGallery } from '@/components/organization/image-analysis/GeneratedImagesGallery';
 import { OrganizationUsers } from '@/components/organization/OrganizationUsers';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { organizationAPI, subscriptionAPI, paymentAPI } from '@/lib/api';
@@ -532,7 +532,7 @@ export default function OrganizationDetailPage() {
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Image Analysis</h2>
               <p className="text-gray-600 dark:text-gray-400">Analyze and review generated images across all projects</p>
             </div>
-            <IndividualImagesView />
+            <GeneratedImagesGallery organizationId={params.id} />
           </TabsContent>
 
           <TabsContent value="plans" className="m-0 p-8">
