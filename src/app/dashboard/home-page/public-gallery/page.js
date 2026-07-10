@@ -16,6 +16,7 @@ import {
   Download,
 } from 'lucide-react';
 import { homepageAPI } from '@/lib/api';
+import SmartImage from '@/utils/SmartImage';
 
 const IMAGE_TYPES = [
   { value: 'lifestyle', label: 'Lifestyle', layout: 'lifestyle' },
@@ -107,11 +108,14 @@ function LiveImageGrid({ images, emptyText, onPreview }) {
           onClick={() => onPreview?.(img)}
           className="text-left rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden bg-white dark:bg-gray-900 hover:ring-2 hover:ring-blue-500 transition-shadow"
         >
-          <div className="aspect-square bg-gray-100 dark:bg-gray-800">
-            <img
-              src={img.image_url || img.src}
+          <div className="aspect-square bg-gray-100 dark:bg-gray-800 relative">
+            <SmartImage
+              src={img.src}
+              fallbackSrc={img.image_url}
+              fill
+              sizes="(max-width: 768px) 50vw, 20vw"
               alt={img.alt || img.label}
-              className="w-full h-full object-cover"
+              className="object-cover"
             />
           </div>
           <div className="p-2.5">
@@ -567,7 +571,14 @@ export default function PublicGalleryAdminPage() {
                     onClick={() => setPreviewImage(img)}
                     className="relative aspect-square w-full bg-gray-100 dark:bg-gray-800 group"
                   >
-                    <img src={imageUrl} alt={img.alt || img.label} className="w-full h-full object-cover" />
+                    <SmartImage
+                      src={img.src}
+                      fallbackSrc={img.image_url}
+                      fill
+                      sizes="(max-width: 768px) 50vw, 20vw"
+                      alt={img.alt || img.label}
+                      className="object-cover"
+                    />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/35 transition-colors flex items-center justify-center">
                       <span className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-black/70 text-white text-sm">
                         <Eye className="w-4 h-4" />
@@ -657,11 +668,14 @@ export default function PublicGalleryAdminPage() {
               </button>
             </div>
 
-            <div className="p-4">
-              <img
-                src={previewImage.image_url || previewImage.src}
+            <div className="p-4 relative aspect-video">
+              <SmartImage
+                src={previewImage.src}
+                fallbackSrc={previewImage.image_url}
+                fill
+                sizes="100vw"
                 alt={previewImage.alt || previewImage.label}
-                className="w-full max-h-[60vh] object-contain rounded-lg bg-gray-100 dark:bg-gray-800"
+                className="object-contain rounded-lg bg-gray-100 dark:bg-gray-800"
               />
             </div>
 

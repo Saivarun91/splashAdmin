@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Upload, Trash2, ArrowUp, ArrowDown, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { homepageAPI } from '@/lib/api';
+import SmartImage from '@/utils/SmartImage';
 
 export default function BeforeAfterPage() {
   const [images, setImages] = useState([]);
@@ -250,19 +251,29 @@ export default function BeforeAfterPage() {
                   <div className="flex-1 grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Before</p>
-                      <img
-                        src={image.before_image_url}
+                    <div className="relative aspect-[4/3]">
+                      <SmartImage
+                        src={image.before_image_path}
+                        fallbackSrc={image.before_image_url}
+                        fill
+                        sizes="(max-width: 768px) 50vw, 25vw"
                         alt="Before"
-                        className="w-full h-48 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+                        className="object-cover rounded-lg border border-gray-200 dark:border-gray-700"
                       />
+                    </div>
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">After</p>
-                      <img
-                        src={image.after_image_url}
+                    <div className="relative aspect-[4/3]">
+                      <SmartImage
+                        src={image.after_image_path}
+                        fallbackSrc={image.after_image_url}
+                        fill
+                        sizes="(max-width: 768px) 50vw, 25vw"
                         alt="After"
-                        className="w-full h-48 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+                        className="object-cover rounded-lg border border-gray-200 dark:border-gray-700"
                       />
+                    </div>
                     </div>
                   </div>
 

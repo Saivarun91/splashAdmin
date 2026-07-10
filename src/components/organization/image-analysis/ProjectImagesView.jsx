@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { FolderKanban, Image as ImageIcon, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ImageDetailView } from './ImageDetailView';
+import GeneratedSmartImage from '@/components/images/GeneratedSmartImage';
 
 // eslint-disable-next-line react/prop-types
 export function ProjectImagesView({ project, collectionData }) {
@@ -30,9 +31,11 @@ export function ProjectImagesView({ project, collectionData }) {
             productIndex: productIdx,
             imageIndex: imgIdx,
             type: genImage.type,
-            imageUrl: genImage.image_url || genImage.local_path || genImage.cloud_url,
+            imageUrl: genImage.image_url || genImage.cloud_url,
+            imageLocalPath: genImage.local_path,
             prompt: genImage.prompt,
-            productImage: product.uploaded_image_url || product.uploaded_image_path,
+            productImage: product.uploaded_image_url,
+            productImagePath: product.uploaded_image_path,
             collectionData: collectionData,
           });
         });
@@ -119,10 +122,12 @@ export function ProjectImagesView({ project, collectionData }) {
                 onClick={() => setSelectedImage(image)}
                 className="relative aspect-square rounded-lg overflow-hidden border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 cursor-pointer hover:border-blue-500 dark:hover:border-blue-500 transition-all hover:shadow-lg group"
               >
-                <img
-                  src={image.imageUrl || '/placeholder.jpg'}
+                <GeneratedSmartImage
+                  image={{ local_path: image.imageLocalPath, image_url: image.imageUrl, id: image.id }}
+                  fill
+                  sizes="(max-width: 768px) 50vw, 25vw"
                   alt={`${image.type} image`}
-                  className="w-full h-full object-cover"
+                  className="object-cover"
                 />
                 <div className="absolute top-2 right-2">
                   <Badge className={getImageTypeBadge(image.type)}>

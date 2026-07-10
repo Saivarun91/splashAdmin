@@ -232,6 +232,12 @@ export default function Sidebar() {
                         <Link href="/dashboard/home-page/home-content" onClick={() => setIsMobileOpen(false)} className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm ${pathname === '/dashboard/home-page/home-content' ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                           <span className="ml-4">Home Content</span>
                         </Link>
+                        <Link href="/dashboard/home-page/contact" onClick={() => setIsMobileOpen(false)} className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm ${pathname === '/dashboard/home-page/contact' ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+                          <span className="ml-4">Contact Page</span>
+                        </Link>
+                        <Link href="/dashboard/home-page/faqs" onClick={() => setIsMobileOpen(false)} className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm ${pathname === '/dashboard/home-page/faqs' ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+                          <span className="ml-4">FAQs Page</span>
+                        </Link>
                         <Link href="/dashboard/home-page/about" onClick={() => setIsMobileOpen(false)} className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm ${pathname === '/dashboard/home-page/about' ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                           <span className="ml-4">About</span>
                         </Link>

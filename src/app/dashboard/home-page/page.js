@@ -1,12 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { Image, FileText, Layout, BookOpen, Target, Video, Shield } from 'lucide-react';
+import { Image, FileText, Layout, BookOpen, Target, Video, Shield, MessageSquare, HelpCircle } from 'lucide-react';
 
 const sections = [
   { name: 'Before After', href: '/dashboard/home-page/before-after', icon: Image, description: 'Before/after image pairs on home' },
-  { name: 'Hero & CTA', href: '/dashboard/home-page/hero', icon: Layout, description: 'Hero title, CTAs, and carousel images' },
-  { name: 'Home Content', href: '/dashboard/home-page/home-content', icon: FileText, description: 'Chapters, features, showcase, how it works, footer' },
+  { name: 'Hero & CTA', href: '/dashboard/home-page/hero', icon: Layout, description: 'Hero title, pill text, CTAs, and subtitle' },
+  { name: 'Home Content', href: '/dashboard/home-page/home-content', icon: FileText, description: 'All homepage sections: hero, ticker, capabilities, testimonials, etc.' },
+  { name: 'Public Gallery', href: '/dashboard/home-page/public-gallery', icon: Image, description: 'Gallery images and homepage showcase grid' },
+  { name: 'Contact Page', href: '/dashboard/home-page/contact', icon: MessageSquare, description: 'Contact page details and form copy' },
+  { name: 'FAQs Page', href: '/dashboard/home-page/faqs', icon: HelpCircle, description: 'FAQs page questions and answers' },
   { name: 'About', href: '/dashboard/home-page/about', icon: BookOpen, description: 'About page content and images' },
   { name: 'Blog', href: '/dashboard/home-page/blog', icon: FileText, description: 'Blog posts list and editor' },
   { name: 'Vision & Mission', href: '/dashboard/home-page/vision-mission', icon: Target, description: 'Vision & mission page content' },

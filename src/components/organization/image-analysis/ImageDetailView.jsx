@@ -2,6 +2,7 @@
 
 import { X, FileText, Upload, Image as ImageIcon, Palette, User, Box, Sparkles, CheckCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import SmartImage from '@/utils/SmartImage';
 
 // eslint-disable-next-line react/prop-types
 export function ImageDetailView({ image, type, onClose, collectionData }) {
@@ -135,10 +136,13 @@ export function ImageDetailView({ image, type, onClose, collectionData }) {
               <div className="sticky top-0">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Generated Image</h3>
                 <div className="relative aspect-square rounded-lg overflow-hidden border-2 border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
-                  <img
-                    src={image.imageUrl || '/placeholder.jpg'}
+                  <SmartImage
+                    src={image.imageLocalPath}
+                    fallbackSrc={image.imageUrl}
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 50vw"
                     alt="Generated image"
-                    className="w-full h-full object-contain"
+                    className="object-contain"
                   />
                 </div>
               </div>
@@ -235,10 +239,13 @@ export function ImageDetailView({ image, type, onClose, collectionData }) {
                         Uploaded Image
                       </h3>
                       <div className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
-                        <img
-                          src={image.uploadedImageUrl}
+                        <SmartImage
+                          src={image.uploadedImagePath}
+                          fallbackSrc={image.uploadedImageUrl}
+                          fill
+                          sizes="(max-width: 1024px) 100vw, 50vw"
                           alt="Uploaded image"
-                          className="w-full h-full object-contain"
+                          className="object-contain"
                         />
                       </div>
                     </div>
@@ -267,10 +274,13 @@ export function ImageDetailView({ image, type, onClose, collectionData }) {
                         Reference Image
                       </h3>
                       <div className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
-                        <img
-                          src={image.referenceImageUrl}
+                        <SmartImage
+                          src={image.referenceImagePath}
+                          fallbackSrc={image.referenceImageUrl}
+                          fill
+                          sizes="(max-width: 1024px) 100vw, 50vw"
                           alt="Reference image"
-                          className="w-full h-full object-contain"
+                          className="object-contain"
                         />
                       </div>
                     </div>

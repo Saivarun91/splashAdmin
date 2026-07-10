@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Image as ImageIcon, Palette, User, Box, FileText, ZoomIn, X } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import SmartImage from '@/utils/SmartImage';
+import GeneratedSmartImage, { getModelImageSources, getProductImageSources } from '@/components/images/GeneratedSmartImage';
 
 // eslint-disable-next-line react/prop-types
 export function ProjectImagesTab({ project, collectionData }) {
@@ -126,12 +128,14 @@ export function ProjectImagesTab({ project, collectionData }) {
             <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Selected Model</h4>
           </div>
           <div className="flex items-center gap-4">
-            <div className="w-24 h-24 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden">
+            <div className="w-24 h-24 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden relative">
               {item.selected_model.cloud_url || item.selected_model.local_url ? (
-                <img
-                  src={item.selected_model.cloud_url || item.selected_model.local_url}
+                <SmartImage
+                  {...getModelImageSources(item.selected_model)}
+                  fill
+                  sizes="96px"
                   alt="Selected model"
-                  className="w-full h-full object-cover"
+                  className="object-cover"
                 />
               ) : (
                 <User className="w-12 h-12 text-gray-400" />
@@ -164,11 +168,13 @@ export function ProjectImagesTab({ project, collectionData }) {
                 <Box className="w-4 h-4 text-blue-500" />
                 Product Image {productIdx + 1}
               </h5>
-              <div className="relative w-full max-w-md rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-                <img
-                  src={product.uploaded_image_url || product.uploaded_image_path || '/placeholder-product.jpg'}
+              <div className="relative w-full max-w-md rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 aspect-[4/3]">
+                <SmartImage
+                  {...getProductImageSources(product)}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 448px"
                   alt={`Product ${productIdx + 1}`}
-                  className="w-full h-64 object-contain bg-gray-50 dark:bg-gray-900 cursor-pointer"
+                  className="object-contain bg-gray-50 dark:bg-gray-900 cursor-pointer"
                   onClick={() => setZoomedImage(product.uploaded_image_url || product.uploaded_image_path)}
                 />
                 <button
@@ -192,10 +198,12 @@ export function ProjectImagesTab({ project, collectionData }) {
                       onClick={() => setSelectedImage(genImage)}
                     >
                       <div className="relative aspect-square">
-                        <img
-                          src={genImage.image_url || genImage.local_path || genImage.cloud_url || '/placeholder.jpg'}
+                        <GeneratedSmartImage
+                          image={genImage}
+                          fill
+                          sizes="(max-width: 768px) 100vw, 33vw"
                           alt={`Generated ${genImage.type || 'image'}`}
-                          className="w-full h-full object-cover"
+                          className="object-cover"
                         />
                         <div className="absolute top-2 right-2">
                 <Badge className={getImageTypeBadge(genImage.type)}>
@@ -255,11 +263,13 @@ export function ProjectImagesTab({ project, collectionData }) {
               </button>
             </div>
             <div className="p-6">
-              <div className="mb-4">
-                <img
-                  src={selectedImage.image_url || selectedImage.local_path || selectedImage.cloud_url}
+              <div className="relative aspect-square mb-4">
+                <GeneratedSmartImage
+                  image={selectedImage}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 896px"
                   alt="Generated image"
-                  className="w-full rounded-lg border border-gray-200 dark:border-gray-800"
+                  className="object-contain rounded-lg border border-gray-200 dark:border-gray-800"
                 />
               </div>
               <div>

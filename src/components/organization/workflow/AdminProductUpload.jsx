@@ -1,6 +1,8 @@
 'use client';
 
 import { Box, Image as ImageIcon } from 'lucide-react';
+import SmartImage from '@/utils/SmartImage';
+import { getProductImageSources } from '@/components/images/GeneratedSmartImage';
 
 // eslint-disable-next-line react/prop-types
 export function AdminProductUpload({ collectionData }) {
@@ -29,10 +31,12 @@ export function AdminProductUpload({ collectionData }) {
               className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800"
             >
               <div className="aspect-square relative bg-gray-100 dark:bg-gray-900">
-                <img
-                  src={product.uploaded_image_url || product.uploaded_image_path || '/placeholder.jpg'}
+                <SmartImage
+                  {...getProductImageSources(product)}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 33vw"
                   alt={`Product ${idx + 1}`}
-                  className="w-full h-full object-contain"
+                  className="object-contain"
                 />
               </div>
               <div className="p-3">

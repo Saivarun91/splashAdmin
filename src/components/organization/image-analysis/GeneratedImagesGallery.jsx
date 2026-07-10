@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Image as ImageIcon, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ImageDetailView } from './ImageDetailView';
+import GeneratedSmartImage from '@/components/images/GeneratedSmartImage';
 import { organizationAPI, individualUserAPI } from '@/lib/api';
 
 const PAGE_SIZE = 20;
@@ -71,8 +72,11 @@ export function GeneratedImagesGallery({ organizationId, userId }) {
           id: img.id,
           type: img.image_type || img.type,
           imageUrl: img.image_url,
+          imageLocalPath: img.generated_image_path || img.metadata?.generated_image_path || null,
           uploadedImageUrl: img.metadata?.uploaded_image_url || null,
+          uploadedImagePath: img.metadata?.uploaded_image_path || null,
           referenceImageUrl: img.metadata?.model_image_url || null,
+          referenceImagePath: img.metadata?.model_image_path || null,
           userPrompt: img.original_prompt || null,
           finalPrompt: img.prompt || '',
           created_at: img.created_at,
@@ -196,10 +200,12 @@ export function GeneratedImagesGallery({ organizationId, userId }) {
                 onClick={() => setSelectedImage(image)}
                 className="relative aspect-square rounded-lg overflow-hidden border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 cursor-pointer hover:border-blue-500 dark:hover:border-blue-500 transition-all hover:shadow-lg group"
               >
-                <img
-                  src={image.imageUrl || '/placeholder.jpg'}
+                <GeneratedSmartImage
+                  image={{ local_path: image.imageLocalPath, image_url: image.imageUrl, id: image.id }}
+                  fill
+                  sizes="(max-width: 768px) 50vw, 25vw"
                   alt={`${image.type} image`}
-                  className="w-full h-full object-cover"
+                  className="object-cover"
                 />
                 <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
                   <Badge className={TYPE_BADGES[image.type] || 'bg-gray-100 text-gray-800'}>

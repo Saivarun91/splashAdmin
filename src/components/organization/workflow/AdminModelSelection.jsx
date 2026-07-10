@@ -2,6 +2,8 @@
 
 import { User, Image as ImageIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import SmartImage from '@/utils/SmartImage';
+import { getModelImageSources } from '@/components/images/GeneratedSmartImage';
 
 // eslint-disable-next-line react/prop-types
 export function AdminModelSelection({ collectionData }) {
@@ -28,12 +30,14 @@ export function AdminModelSelection({ collectionData }) {
           <div>
             <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Selected Model</h4>
             <div className="flex items-start gap-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
-              <div className="w-32 h-32 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
+              <div className="w-32 h-32 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-900 flex items-center justify-center relative">
                 {selectedModel.cloud_url || selectedModel.local_url ? (
-                  <img
-                    src={selectedModel.cloud_url || selectedModel.local_url}
+                  <SmartImage
+                    {...getModelImageSources(selectedModel)}
+                    fill
+                    sizes="128px"
                     alt="Selected model"
-                    className="w-full h-full object-cover"
+                    className="object-cover"
                   />
                 ) : (
                   <User className="w-12 h-12 text-gray-400" />
@@ -69,10 +73,12 @@ export function AdminModelSelection({ collectionData }) {
                 key={idx}
                 className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
               >
-                <img
-                  src={model.cloud_url || model.local_path || '/placeholder.jpg'}
+                <SmartImage
+                  {...getModelImageSources(model)}
+                  fill
+                  sizes="(max-width: 768px) 50vw, 25vw"
                   alt={model.original_filename || `Model ${idx + 1}`}
-                  className="w-full h-full object-cover"
+                  className="object-cover"
                 />
               </div>
             ))}
@@ -92,10 +98,12 @@ export function AdminModelSelection({ collectionData }) {
                 key={idx}
                 className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
               >
-                <img
-                  src={model.cloud_url || model.local_path || '/placeholder.jpg'}
+                <SmartImage
+                  {...getModelImageSources(model)}
+                  fill
+                  sizes="(max-width: 768px) 50vw, 25vw"
                   alt={model.name || `AI Model ${idx + 1}`}
-                  className="w-full h-full object-cover"
+                  className="object-cover"
                 />
               </div>
             ))}

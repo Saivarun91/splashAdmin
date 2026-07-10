@@ -2,6 +2,8 @@
 
 import { Image as ImageIcon, Download, Eye, FileImage, X } from 'lucide-react';
 import { useState } from 'react';
+import SmartImage from '@/utils/SmartImage';
+import { getGalleryImageSources } from '@/components/images/GeneratedSmartImage';
 
 export function ImageGallery({ images, title = 'Images' }) {
   const [selectedImage, setSelectedImage] = useState(null);
@@ -30,10 +32,12 @@ export function ImageGallery({ images, title = 'Images' }) {
               onClick={() => setSelectedImage(image)}
             >
               {image.url || image.cloud_url || image.local_url ? (
-                <img
-                  src={image.url || image.cloud_url || image.local_url}
+                <SmartImage
+                  {...getGalleryImageSources(image)}
+                  fill
+                  sizes="(max-width: 768px) 50vw, 25vw"
                   alt={`Image ${index + 1}`}
-                  className="w-full h-full object-cover"
+                  className="object-cover"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
@@ -56,8 +60,11 @@ export function ImageGallery({ images, title = 'Images' }) {
         >
           <div className="max-w-4xl w-full bg-white dark:bg-gray-900 rounded-xl overflow-hidden">
             <div className="relative">
-              <img
-                src={selectedImage.url || selectedImage.cloud_url || selectedImage.local_url}
+            <div className="relative aspect-auto min-h-[200px]">
+              <SmartImage
+                {...getGalleryImageSources(selectedImage)}
+                width={1200}
+                height={800}
                 alt="Selected"
                 className="w-full h-auto max-h-[80vh] object-contain"
               />

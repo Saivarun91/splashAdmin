@@ -2,6 +2,8 @@
 
 import { Palette } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import SmartImage from '@/utils/SmartImage';
+import { getMoodboardImageSources } from '@/components/images/GeneratedSmartImage';
 
 // eslint-disable-next-line react/prop-types
 export function AdminColorPalette({ collectionData }) {
@@ -72,10 +74,12 @@ export function AdminColorPalette({ collectionData }) {
                 key={idx}
                 className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
               >
-                <img
-                  src={img.cloud_url || img.local_path || '/placeholder.jpg'}
+                <SmartImage
+                  {...getMoodboardImageSources(img)}
+                  fill
+                  sizes="(max-width: 768px) 50vw, 25vw"
                   alt={img.original_filename || `Color ${idx + 1}`}
-                  className="w-full h-full object-cover"
+                  className="object-cover"
                 />
               </div>
             ))}

@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Image as ImageIcon, FileText, Upload, ImagePlus, X, ZoomIn } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import SmartImage from '@/utils/SmartImage';
+import GeneratedSmartImage from '@/components/images/GeneratedSmartImage';
 
 // eslint-disable-next-line react/prop-types
 export function IndividualImagesTab({ project }) {
@@ -100,10 +102,13 @@ export function IndividualImagesTab({ project }) {
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Uploaded Image</span>
               </div>
               <div className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-                <img
-                  src={image.uploaded_image_url || '/placeholder.jpg'}
+                <SmartImage
+                  src={image.uploaded_image_path}
+                  fallbackSrc={image.uploaded_image_url}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 33vw"
                   alt="Uploaded"
-                  className="w-full h-full object-cover cursor-pointer"
+                  className="object-cover cursor-pointer"
                   onClick={() => setZoomedImage(image.uploaded_image_url)}
                 />
                 <button
@@ -123,10 +128,13 @@ export function IndividualImagesTab({ project }) {
               </div>
               {image.reference_image_url ? (
                 <div className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-                  <img
-                    src={image.reference_image_url}
+                  <SmartImage
+                    src={image.reference_image_path}
+                    fallbackSrc={image.reference_image_url}
+                    fill
+                    sizes="(max-width: 768px) 100vw, 33vw"
                     alt="Reference"
-                    className="w-full h-full object-cover cursor-pointer"
+                    className="object-cover cursor-pointer"
                     onClick={() => setZoomedImage(image.reference_image_url)}
                   />
                   <button
@@ -150,10 +158,16 @@ export function IndividualImagesTab({ project }) {
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Generated Image</span>
               </div>
               <div className="relative aspect-square rounded-lg overflow-hidden border-2 border-green-300 dark:border-green-700 bg-gray-50 dark:bg-gray-900">
-                <img
-                  src={image.generated_image_url || '/placeholder.jpg'}
+                <GeneratedSmartImage
+                  image={{
+                    generated_image_path: image.generated_image_path,
+                    generated_image_url: image.generated_image_url,
+                    id: image.id,
+                  }}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 33vw"
                   alt="Generated"
-                  className="w-full h-full object-cover cursor-pointer"
+                  className="object-cover cursor-pointer"
                   onClick={() => {
                     setSelectedImage(image);
                     setZoomedImage(image.generated_image_url);
@@ -212,11 +226,17 @@ export function IndividualImagesTab({ project }) {
               </button>
             </div>
             <div className="p-6 space-y-6">
-              <div>
-                <img
-                  src={selectedImage.generated_image_url}
+              <div className="relative aspect-video">
+                <GeneratedSmartImage
+                  image={{
+                    generated_image_path: selectedImage.generated_image_path,
+                    generated_image_url: selectedImage.generated_image_url,
+                    id: selectedImage.id,
+                  }}
+                  fill
+                  sizes="100vw"
                   alt="Generated image"
-                  className="w-full rounded-lg border border-gray-200 dark:border-gray-800"
+                  className="object-contain rounded-lg border border-gray-200 dark:border-gray-800"
                 />
               </div>
 
@@ -224,21 +244,31 @@ export function IndividualImagesTab({ project }) {
                 {selectedImage.uploaded_image_url && (
                   <div>
                     <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Uploaded Image</h4>
-                    <img
-                      src={selectedImage.uploaded_image_url}
-                      alt="Uploaded"
-                      className="w-full rounded-lg border border-gray-200 dark:border-gray-800"
-                    />
+                    <div className="relative aspect-square">
+                      <SmartImage
+                        src={selectedImage.uploaded_image_path}
+                        fallbackSrc={selectedImage.uploaded_image_url}
+                        fill
+                        sizes="(max-width: 768px) 100vw, 50vw"
+                        alt="Uploaded"
+                        className="object-contain rounded-lg border border-gray-200 dark:border-gray-800"
+                      />
+                    </div>
                   </div>
                 )}
                 {selectedImage.reference_image_url && (
                   <div>
                     <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Reference Image</h4>
-                    <img
-                      src={selectedImage.reference_image_url}
-                      alt="Reference"
-                      className="w-full rounded-lg border border-gray-200 dark:border-gray-800"
-                    />
+                    <div className="relative aspect-square">
+                      <SmartImage
+                        src={selectedImage.reference_image_path}
+                        fallbackSrc={selectedImage.reference_image_url}
+                        fill
+                        sizes="(max-width: 768px) 100vw, 50vw"
+                        alt="Reference"
+                        className="object-contain rounded-lg border border-gray-200 dark:border-gray-800"
+                      />
+                    </div>
                   </div>
                 )}
               </div>

@@ -2,6 +2,7 @@
 
 import { Sparkles, FileText, Image as ImageIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import GeneratedSmartImage from '@/components/images/GeneratedSmartImage';
 
 // eslint-disable-next-line react/prop-types
 export function AdminImageGeneration({ collectionData }) {
@@ -71,10 +72,12 @@ export function AdminImageGeneration({ collectionData }) {
                       className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-800"
                     >
                       <div className="aspect-square relative">
-                        <img
-                          src={genImage.image_url || genImage.local_path || genImage.cloud_url || '/placeholder.jpg'}
+                        <GeneratedSmartImage
+                          image={genImage}
+                          fill
+                          sizes="(max-width: 768px) 50vw, 25vw"
                           alt={`Generated ${genImage.type || 'image'}`}
-                          className="w-full h-full object-cover"
+                          className="object-cover"
                         />
                         <div className="absolute top-2 right-2">
                           <Badge className={getImageTypeBadge(genImage.type)}>

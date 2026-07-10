@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Image as ImageIcon, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ImageDetailView } from './ImageDetailView';
+import GeneratedSmartImage from '@/components/images/GeneratedSmartImage';
 
 export function IndividualImagesView() {
   const [selectedImage, setSelectedImage] = useState(null);
@@ -132,10 +133,12 @@ export function IndividualImagesView() {
                 onClick={() => setSelectedImage(image)}
                 className="relative aspect-square rounded-lg overflow-hidden border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 cursor-pointer hover:border-blue-500 dark:hover:border-blue-500 transition-all hover:shadow-lg group"
               >
-                <img
-                  src={image.imageUrl || '/placeholder.jpg'}
+                <GeneratedSmartImage
+                  image={{ local_path: image.imageLocalPath, image_url: image.imageUrl, id: image.id }}
+                  fill
+                  sizes="(max-width: 768px) 50vw, 25vw"
                   alt={`${image.type} image`}
-                  className="w-full h-full object-cover"
+                  className="object-cover"
                 />
                 <div className="absolute top-2 right-2">
                   <Badge className={getImageTypeBadge(image.type)}>
