@@ -432,6 +432,25 @@ export const subscriptionAPI = {
   }),
 };
 
+export const pricingAPI = {
+  getAll: () => apiRequest('/api/plans/pricing/'),
+  create: (data) => apiRequest('/api/plans/pricing/create/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  update: (id, data) => apiRequest(`/api/plans/pricing/${id}/update/`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+  delete: (id) => apiRequest(`/api/plans/pricing/${id}/delete/`, {
+    method: 'DELETE',
+  }),
+  updateTaxConfig: (data) => apiRequest('/api/plans/pricing/tax-config/', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+};
+
 
 
 // Prompt Master endpoints
@@ -484,7 +503,7 @@ export const paymentAPI = {
     const queryString = new URLSearchParams(params).toString();
     return apiRequest(`/api/payments/admin/all/?${queryString}`);
   },
-  getById: (id) => apiRequest(`/probackendapp/api/admin/payments/${id}`),
+  getById: (id) => apiRequest(`/api/payments/admin/${id}/`),
   getRevenue: () => apiRequest('/api/payments/admin/revenue/'),
   getHistory: (organizationId) => apiRequest(`/api/payments/history/?organization_id=${organizationId}`),
   getSalesLeads: () => apiRequest('/api/payments/admin/leads/'),

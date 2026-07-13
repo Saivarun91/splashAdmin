@@ -7,7 +7,7 @@ import { ImageDetailView } from './ImageDetailView';
 import GeneratedSmartImage from '@/components/images/GeneratedSmartImage';
 
 // eslint-disable-next-line react/prop-types
-export function ProjectImagesView({ project, collectionData }) {
+export function ProjectImagesView({ project, collectionData, collectionLoading = false }) {
   const [selectedImage, setSelectedImage] = useState(null);
   const [selectedProject, setSelectedProject] = useState(project);
 
@@ -56,6 +56,15 @@ export function ProjectImagesView({ project, collectionData }) {
     };
     return badges[type] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
   };
+
+  if (collectionLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-gray-500 dark:text-gray-400">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-4" />
+        <p>Loading project images...</p>
+      </div>
+    );
+  }
 
   if (selectedImage) {
     return (

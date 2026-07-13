@@ -8,7 +8,7 @@ import GeneratedSmartImage from '@/components/images/GeneratedSmartImage';
 export function AdminImageGeneration({ collectionData }) {
   const item = collectionData?.items?.[0];
   const productImages = item?.product_images || [];
-  const generatedPrompts = collectionData?.generated_prompts || {};
+  const generatedPrompts = item?.generated_prompts || collectionData?.generated_prompts || {};
 
   const getImageTypeBadge = (type) => {
     const badges = {

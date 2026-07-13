@@ -8,7 +8,7 @@ import { ProjectsGrid } from '@/components/organization/ProjectsGrid';
 import { ProjectDetailView } from '@/components/organization/ProjectDetailView';
 import { GeneratedImagesGallery } from '@/components/organization/image-analysis/GeneratedImagesGallery';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { individualUserAPI, subscriptionAPI, paymentAPI } from '@/lib/api';
+import { individualUserAPI, subscriptionAPI, paymentAPI, projectAPI } from '@/lib/api';
 import { PlanCard } from '@/components/subscriptions/PlanCard';
 
 export default function IndividualUserDetailPage() {
@@ -17,6 +17,7 @@ export default function IndividualUserDetailPage() {
   const [user, setUser] = useState(null);
   const [selectedProject, setSelectedProject] = useState(null);
   const [collectionData, setCollectionData] = useState(null);
+  const [collectionLoading, setCollectionLoading] = useState(false);
   const [showProjectDetail, setShowProjectDetail] = useState(false);
   const [activeMainTab, setActiveMainTab] = useState('projects');
   const [loading, setLoading] = useState(true);
@@ -98,8 +99,60 @@ export default function IndividualUserDetailPage() {
     fetchPayments();
   }, [activeMainTab, params.id]);
 
+  const normalizeCollectionData = (projectDetail) => {
+    const collection = projectDetail?.collection;
+    if (!collection) return null;
+    const item = collection.items?.[0];
+    return {
+      ...collection,
+      generated_prompts: item?.generated_prompts || {},
+      final_moodboard_prompt: item?.final_moodboard_prompt || '',
+      moodboard_explanation: item?.moodboard_explanation || '',
+    };
+  };
+
+  useEffect(() => {
+    if (!selectedProject?.id) return undefined;
+
+    let cancelled = false;
+
+    const fetchProjectCollection = async () => {
+      setCollectionLoading(true);
+      setCollectionData(null);
+      try {
+        const projectDetail = await projectAPI.getById(selectedProject.id);
+        if (cancelled) return;
+        setCollectionData(normalizeCollectionData(projectDetail));
+        if (projectDetail?.collection_id || projectDetail?.team_members) {
+          setSelectedProject((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  collection_id: projectDetail.collection_id || prev.collection_id,
+                  team_members: projectDetail.team_members || prev.team_members,
+                  about: projectDetail.about ?? prev.about,
+                  status: projectDetail.status ?? prev.status,
+                }
+              : prev
+          );
+        }
+      } catch (error) {
+        console.error('Failed to fetch project collection:', error);
+        if (!cancelled) setCollectionData(null);
+      } finally {
+        if (!cancelled) setCollectionLoading(false);
+      }
+    };
+
+    fetchProjectCollection();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProject?.id]);
+
   const handleProjectSelect = (project) => {
     setSelectedProject(project);
+    setCollectionData(null);
     setShowProjectDetail(true);
   };
 
@@ -324,10 +377,12 @@ export default function IndividualUserDetailPage() {
         <ProjectDetailView
           project={selectedProject}
           collectionData={collectionData}
+          collectionLoading={collectionLoading}
           onClose={() => {
             setShowProjectDetail(false);
             setSelectedProject(null);
             setCollectionData(null);
+            setCollectionLoading(false);
           }}
         />
       )}

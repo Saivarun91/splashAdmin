@@ -90,14 +90,15 @@ export function ImageDetailView({ image, type, onClose, collectionData }) {
     }
 
     // Step 5: Image Generation
-    if (collectionData.generated_prompts) {
+    const generatedPrompts = item?.generated_prompts || collectionData.generated_prompts;
+    if (generatedPrompts && Object.keys(generatedPrompts).length > 0) {
       steps.push({
         number: 5,
         title: 'Final Image Generation',
         icon: Sparkles,
         completed: true,
         details: {
-          prompts: collectionData.generated_prompts,
+          prompts: generatedPrompts,
         },
       });
     }

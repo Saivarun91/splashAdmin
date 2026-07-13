@@ -1,17 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AdminBriefAndConcept } from './workflow/AdminBriefAndConcept';
 import { AdminThemesAndBackgrounds } from './workflow/AdminThemesAndBackgrounds';
 import { AdminColorPalette } from './workflow/AdminColorPalette';
 import { AdminGlobalInstructions } from './workflow/AdminGlobalInstructions';
+import { AdminMoodboardPrompt } from './workflow/AdminMoodboardPrompt';
 import { AdminModelSelection } from './workflow/AdminModelSelection';
 import { AdminProductUpload } from './workflow/AdminProductUpload';
 import { AdminImageGeneration } from './workflow/AdminImageGeneration';
 
 // eslint-disable-next-line react/prop-types
-export function AdminWorkflowTab({ project, collectionData }) {
+export function AdminWorkflowTab({ project, collectionData, collectionLoading }) {
   const [activeStep, setActiveStep] = useState(1);
 
   const steps = [
@@ -22,10 +23,16 @@ export function AdminWorkflowTab({ project, collectionData }) {
     { number: 5, title: 'Final Image Generation' },
   ];
 
+  const getGeneratedPrompts = () => {
+    const item = collectionData?.items?.[0];
+    return item?.generated_prompts || collectionData?.generated_prompts || {};
+  };
+
   // Determine which steps are completed
   const isStepCompleted = (stepNumber) => {
     if (!collectionData) return false;
     const item = collectionData.items?.[0];
+    const generatedPrompts = getGeneratedPrompts();
 
     switch (stepNumber) {
       case 1:
@@ -35,20 +42,41 @@ export function AdminWorkflowTab({ project, collectionData }) {
           (item?.selected_themes && item.selected_themes.length > 0) ||
           (item?.selected_backgrounds && item.selected_backgrounds.length > 0) ||
           (item?.selected_colors && item.selected_colors.length > 0) ||
-          (item?.global_instructions && item.global_instructions.trim())
+          (item?.global_instructions && item.global_instructions.trim()) ||
+          Object.keys(generatedPrompts).length > 0
         );
       case 3:
         return !!(item?.selected_model || (item?.uploaded_models && item.uploaded_models.length > 0));
       case 4:
         return !!(item?.product_images && item.product_images.length > 0);
       case 5:
-        return !!(collectionData.generated_prompts && Object.keys(collectionData.generated_prompts).length > 0);
+        return !!(
+          Object.keys(generatedPrompts).length > 0 ||
+          item?.product_images?.some((p) => p.generated_images?.length > 0)
+        );
       default:
         return false;
     }
   };
 
   const renderStepContent = () => {
+    if (collectionLoading) {
+      return (
+        <div className="flex flex-col items-center justify-center py-16 text-gray-500 dark:text-gray-400">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-4" />
+          <p>Loading project workflow...</p>
+        </div>
+      );
+    }
+
+    if (!collectionData) {
+      return (
+        <div className="text-center py-16 text-gray-500 dark:text-gray-400">
+          No collection data found for this project.
+        </div>
+      );
+    }
+
     switch (activeStep) {
       case 1:
         return <AdminBriefAndConcept collectionData={collectionData} />;
@@ -58,6 +86,7 @@ export function AdminWorkflowTab({ project, collectionData }) {
             <AdminThemesAndBackgrounds collectionData={collectionData} />
             <AdminColorPalette collectionData={collectionData} />
             <AdminGlobalInstructions collectionData={collectionData} />
+            <AdminMoodboardPrompt collectionData={collectionData} />
           </>
         );
       case 3:

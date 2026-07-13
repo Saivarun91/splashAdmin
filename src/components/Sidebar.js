@@ -26,8 +26,9 @@ import { authAPI } from '@/lib/api';
 const allMenuItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'User', href: '/dashboard/users', icon: Users, hasSubmenu: true },
-  { name: 'Subscriptions', href: '/dashboard/subscriptions', icon: CreditCard },
-  { name: 'Payment History', href: '/dashboard/payment-history', icon: History },
+  { name: 'Pricing', href: '/dashboard/pricing', icon: CreditCard },
+  // { name: 'Subscriptions', href: '/dashboard/subscriptions', icon: CreditCard },
+  // { name: 'Payment History', href: '/dashboard/payment-history', icon: History },
   { name: 'Credits Usage', href: '/dashboard/credits-usage', icon: Coins },
   // { name: 'Image Generation History', href: '/dashboard/image-generation-history', icon: ImageIcon },
   { name: 'Prompt Master', href: '/dashboard/prompt-master', icon: FileText },
@@ -225,9 +226,6 @@ export default function Sidebar() {
                         </Link>
                         <Link href="/dashboard/home-page/public-gallery" onClick={() => setIsMobileOpen(false)} className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm ${pathname === '/dashboard/home-page/public-gallery' ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                           <span className="ml-4">Public Gallery</span>
-                        </Link>
-                        <Link href="/dashboard/home-page/hero" onClick={() => setIsMobileOpen(false)} className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm ${pathname === '/dashboard/home-page/hero' ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
-                          <span className="ml-4">Hero & CTA</span>
                         </Link>
                         <Link href="/dashboard/home-page/home-content" onClick={() => setIsMobileOpen(false)} className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm ${pathname === '/dashboard/home-page/home-content' ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                           <span className="ml-4">Home Content</span>

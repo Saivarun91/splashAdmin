@@ -8,7 +8,7 @@ import { AdminCollaboratorsTab } from './AdminCollaboratorsTab';
 import { ProjectImagesView } from './image-analysis/ProjectImagesView';
 
 // eslint-disable-next-line react/prop-types
-export function ProjectDetailView({ project, collectionData, onClose }) {
+export function ProjectDetailView({ project, collectionData, collectionLoading = false, onClose }) {
   const [activeTab, setActiveTab] = useState('workflow');
 
   if (!project) return null;
@@ -66,7 +66,11 @@ export function ProjectDetailView({ project, collectionData, onClose }) {
 
             <div className="flex-1 overflow-auto">
               <TabsContent value="workflow" className="m-0 p-6">
-                <AdminWorkflowTab project={project} collectionData={collectionData} />
+                <AdminWorkflowTab
+                  project={project}
+                  collectionData={collectionData}
+                  collectionLoading={collectionLoading}
+                />
               </TabsContent>
 
               <TabsContent value="collaborators" className="m-0 p-6">
@@ -74,7 +78,11 @@ export function ProjectDetailView({ project, collectionData, onClose }) {
               </TabsContent>
 
               <TabsContent value="images" className="m-0 p-6">
-                <ProjectImagesView project={project} collectionData={collectionData} />
+                <ProjectImagesView
+                  project={project}
+                  collectionData={collectionData}
+                  collectionLoading={collectionLoading}
+                />
               </TabsContent>
             </div>
           </Tabs>

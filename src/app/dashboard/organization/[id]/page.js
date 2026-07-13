@@ -9,7 +9,7 @@ import { ProjectDetailView } from '@/components/organization/ProjectDetailView';
 import { GeneratedImagesGallery } from '@/components/organization/image-analysis/GeneratedImagesGallery';
 import { OrganizationUsers } from '@/components/organization/OrganizationUsers';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { organizationAPI, subscriptionAPI, paymentAPI } from '@/lib/api';
+import { organizationAPI, subscriptionAPI, paymentAPI, projectAPI } from '@/lib/api';
 import { PlanCard } from '@/components/subscriptions/PlanCard';
 import { CreditCard, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
 
@@ -19,6 +19,7 @@ export default function OrganizationDetailPage() {
   const [organization, setOrganization] = useState(null);
   const [selectedProject, setSelectedProject] = useState(null);
   const [collectionData, setCollectionData] = useState(null);
+  const [collectionLoading, setCollectionLoading] = useState(false);
   const [showProjectDetail, setShowProjectDetail] = useState(false);
   const [activeMainTab, setActiveMainTab] = useState('projects');
   const [loading, setLoading] = useState(true);
@@ -177,101 +178,56 @@ export default function OrganizationDetailPage() {
     }
   }, [activeMainTab, params.id]);
 
-  useEffect(() => {
-    if (selectedProject) {
-      // TODO: Fetch collection data for selected project
-      // const fetchCollection = async () => {
-      //   try {
-      //     const data = await apiService.getCollection(selectedProject.collection_id);
-      //     setCollectionData(data);
-      //   } catch (error) {
-      //     console.error('Failed to fetch collection:', error);
-      //   }
-      // };
-      // fetchCollection();
+  const normalizeCollectionData = (projectDetail) => {
+    const collection = projectDetail?.collection;
+    if (!collection) return null;
+    const item = collection.items?.[0];
+    return {
+      ...collection,
+      generated_prompts: item?.generated_prompts || {},
+      final_moodboard_prompt: item?.final_moodboard_prompt || '',
+      moodboard_explanation: item?.moodboard_explanation || '',
+    };
+  };
 
-      // Mock collection data - Based on Collection model from splash_backend
-      // Structure matches what the components expect (items array)
-      setCollectionData({
-        id: selectedProject.collection_id,
-        description: 'Summer collection featuring vibrant colors, beach themes, and modern fashion',
-        target_audience: 'Young adults aged 18-35',
-        campaign_season: 'Summer 2024',
-        items: [
-          {
-            selected_themes: ['Beach', 'Tropical', 'Casual'],
-            selected_backgrounds: ['Ocean', 'Beach', 'Sunset'],
-            selected_poses: ['Standing', 'Walking', 'Sitting'],
-            selected_locations: ['Beach', 'Resort', 'Outdoor'],
-            selected_colors: ['Blue', 'Yellow', 'White'],
-            picked_colors: ['#3B82F6', '#FBBF24', '#FFFFFF'],
-            color_instructions: 'Use vibrant blues and yellows as primary colors',
-            global_instructions: 'Maintain a fresh, energetic, and modern aesthetic throughout all images',
-            selected_model: {
-              type: 'ai',
-              local_url: '/models/ai-model-1.jpg',
-              cloud_url: 'https://example.com/models/ai-model-1.jpg',
-            },
-            product_images: [
-              {
-                uploaded_image_url: 'https://example.com/products/product-1.jpg',
-                uploaded_image_path: 'https://example.com/products/product-1.jpg',
-                generated_images: [
-                  {
-                    type: 'white_background',
-                    image_url: 'https://example.com/generated/white-bg-1.jpg',
-                    local_path: 'https://example.com/generated/white-bg-1.jpg',
-                    cloud_url: 'https://example.com/generated/white-bg-1.jpg',
-                    prompt: 'Professional white background product photography with sharp focus and studio lighting',
-                  },
-                  {
-                    type: 'background_replace',
-                    image_url: 'https://example.com/generated/bg-replace-1.jpg',
-                    local_path: 'https://example.com/generated/bg-replace-1.jpg',
-                    cloud_url: 'https://example.com/generated/bg-replace-1.jpg',
-                    prompt: 'Product on beach background with ocean and sunset, vibrant colors',
-                  },
-                  {
-                    type: 'model_image',
-                    image_url: 'https://example.com/generated/model-1.jpg',
-                    local_path: 'https://example.com/generated/model-1.jpg',
-                    cloud_url: 'https://example.com/generated/model-1.jpg',
-                    prompt: 'Model wearing summer collection on beach, standing pose, vibrant blue and yellow colors',
-                  },
-                  {
-                    type: 'campaign_image',
-                    image_url: 'https://example.com/generated/campaign-1.jpg',
-                    local_path: 'https://example.com/generated/campaign-1.jpg',
-                    cloud_url: 'https://example.com/generated/campaign-1.jpg',
-                    prompt: 'Campaign shot featuring model in summer collection at beach resort, energetic and modern aesthetic',
-                  },
-                ],
-              },
-              {
-                uploaded_image_url: 'https://example.com/products/product-2.jpg',
-                uploaded_image_path: 'https://example.com/products/product-2.jpg',
-                generated_images: [
-                  {
-                    type: 'white_background',
-                    image_url: 'https://example.com/generated/white-bg-2.jpg',
-                    local_path: 'https://example.com/generated/white-bg-2.jpg',
-                    cloud_url: 'https://example.com/generated/white-bg-2.jpg',
-                    prompt: 'Professional white background product photography with sharp focus and studio lighting',
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-        generated_prompts: {
-          white_background: 'Professional white background product photography with sharp focus and studio lighting',
-          background_replace: 'Product on beach background with ocean and sunset, vibrant colors, maintaining product integrity',
-          model_image: 'Model wearing summer collection on beach, standing pose, vibrant blue and yellow colors, exact same model appearance',
-          campaign_image: 'Campaign shot featuring model in summer collection at beach resort, energetic and modern aesthetic, cohesive style',
-        },
-      });
-    }
-  }, [selectedProject]);
+  useEffect(() => {
+    if (!selectedProject?.id) return undefined;
+
+    let cancelled = false;
+
+    const fetchProjectCollection = async () => {
+      setCollectionLoading(true);
+      setCollectionData(null);
+      try {
+        const projectDetail = await projectAPI.getById(selectedProject.id);
+        if (cancelled) return;
+        setCollectionData(normalizeCollectionData(projectDetail));
+        if (projectDetail?.collection_id || projectDetail?.team_members) {
+          setSelectedProject((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  collection_id: projectDetail.collection_id || prev.collection_id,
+                  team_members: projectDetail.team_members || prev.team_members,
+                  about: projectDetail.about ?? prev.about,
+                  status: projectDetail.status ?? prev.status,
+                }
+              : prev
+          );
+        }
+      } catch (error) {
+        console.error('Failed to fetch project collection:', error);
+        if (!cancelled) setCollectionData(null);
+      } finally {
+        if (!cancelled) setCollectionLoading(false);
+      }
+    };
+
+    fetchProjectCollection();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProject?.id]);
 
   if (loading) {
     return (
@@ -294,91 +250,8 @@ export default function OrganizationDetailPage() {
 
   const handleProjectSelect = (project) => {
     setSelectedProject(project);
+    setCollectionData(null);
     setShowProjectDetail(true);
-    // Load collection data for the selected project
-    // This will be used for both the project detail view and image analysis
-    if (project.collection_id) {
-      // TODO: Replace with actual API call
-      // Mock collection data - Based on Collection model from splash_backend
-      setCollectionData({
-        id: project.collection_id,
-        description: 'Summer collection featuring vibrant colors, beach themes, and modern fashion',
-        target_audience: 'Young adults aged 18-35',
-        campaign_season: 'Summer 2024',
-        items: [
-          {
-            selected_themes: ['Beach', 'Tropical', 'Casual'],
-            selected_backgrounds: ['Ocean', 'Beach', 'Sunset'],
-            selected_poses: ['Standing', 'Walking', 'Sitting'],
-            selected_locations: ['Beach', 'Resort', 'Outdoor'],
-            selected_colors: ['Blue', 'Yellow', 'White'],
-            picked_colors: ['#3B82F6', '#FBBF24', '#FFFFFF'],
-            color_instructions: 'Use vibrant blues and yellows as primary colors',
-            global_instructions: 'Maintain a fresh, energetic, and modern aesthetic throughout all images',
-            selected_model: {
-              type: 'ai',
-              local_url: '/models/ai-model-1.jpg',
-              cloud_url: 'https://example.com/models/ai-model-1.jpg',
-            },
-            product_images: [
-              {
-                uploaded_image_url: 'https://example.com/products/product-1.jpg',
-                uploaded_image_path: 'https://example.com/products/product-1.jpg',
-                generated_images: [
-                  {
-                    type: 'white_background',
-                    image_url: 'https://example.com/generated/white-bg-1.jpg',
-                    local_path: 'https://example.com/generated/white-bg-1.jpg',
-                    cloud_url: 'https://example.com/generated/white-bg-1.jpg',
-                    prompt: 'Professional white background product photography with sharp focus and studio lighting',
-                  },
-                  {
-                    type: 'background_replace',
-                    image_url: 'https://example.com/generated/bg-replace-1.jpg',
-                    local_path: 'https://example.com/generated/bg-replace-1.jpg',
-                    cloud_url: 'https://example.com/generated/bg-replace-1.jpg',
-                    prompt: 'Product on beach background with ocean and sunset, vibrant colors',
-                  },
-                  {
-                    type: 'model_image',
-                    image_url: 'https://example.com/generated/model-1.jpg',
-                    local_path: 'https://example.com/generated/model-1.jpg',
-                    cloud_url: 'https://example.com/generated/model-1.jpg',
-                    prompt: 'Model wearing summer collection on beach, standing pose, vibrant blue and yellow colors',
-                  },
-                  {
-                    type: 'campaign_image',
-                    image_url: 'https://example.com/generated/campaign-1.jpg',
-                    local_path: 'https://example.com/generated/campaign-1.jpg',
-                    cloud_url: 'https://example.com/generated/campaign-1.jpg',
-                    prompt: 'Campaign shot featuring model in summer collection at beach resort, energetic and modern aesthetic',
-                  },
-                ],
-              },
-              {
-                uploaded_image_url: 'https://example.com/products/product-2.jpg',
-                uploaded_image_path: 'https://example.com/products/product-2.jpg',
-                generated_images: [
-                  {
-                    type: 'white_background',
-                    image_url: 'https://example.com/generated/white-bg-2.jpg',
-                    local_path: 'https://example.com/generated/white-bg-2.jpg',
-                    cloud_url: 'https://example.com/generated/white-bg-2.jpg',
-                    prompt: 'Professional white background product photography with sharp focus and studio lighting',
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-        generated_prompts: {
-          white_background: 'Professional white background product photography with sharp focus and studio lighting',
-          background_replace: 'Product on beach background with ocean and sunset, vibrant colors, maintaining product integrity',
-          model_image: 'Model wearing summer collection on beach, standing pose, vibrant blue and yellow colors, exact same model appearance',
-          campaign_image: 'Campaign shot featuring model in summer collection at beach resort, energetic and modern aesthetic, cohesive style',
-        },
-      });
-    }
   };
 
   return (
@@ -725,10 +598,12 @@ export default function OrganizationDetailPage() {
         <ProjectDetailView
           project={selectedProject}
           collectionData={collectionData}
+          collectionLoading={collectionLoading}
           onClose={() => {
             setShowProjectDetail(false);
             setSelectedProject(null);
             setCollectionData(null);
+            setCollectionLoading(false);
           }}
         />
       )}
