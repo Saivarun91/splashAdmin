@@ -571,15 +571,20 @@ export default function HomeContentPage() {
                 </label>
               </div>
             </div>
-            <div><label className={labelClass}>Copyright</label><input type="text" value={footer.copyright} onChange={(e) => setFooter({ ...footer, copyright: e.target.value })} className={inputClass} /></div>
+            <div>
+              <label className={labelClass}>Copyright (HTML allowed)</label>
+              <textarea value={footer.copyright} onChange={(e) => setFooter({ ...footer, copyright: e.target.value })} rows={2} className={inputClass} />
+              <p className={hintClass}>Use &lt;br /&gt; for line breaks and &lt;em&gt; for italic/gold text.</p>
+            </div>
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className={labelClass}>Footer links</label>
                 <button type="button" onClick={() => setFooter({ ...footer, links: [...footer.links, emptyFooterLink()] })} className="flex items-center gap-1 text-sm text-blue-600"><Plus size={14} /> Add link</button>
               </div>
+              <p className={hintClass + ' mb-2'}>Link labels support &lt;br /&gt; and &lt;em&gt; (italic/gold). Links/URLs stay plain text.</p>
               {footer.links.map((link, index) => (
                 <div key={index} className="flex gap-2 mb-2">
-                  <input type="text" value={link.label} onChange={(e) => setFooter({ ...footer, links: footer.links.map((l, i) => (i === index ? { ...l, label: e.target.value } : l)) })} className={`${inputClass} w-40`} placeholder="Label" />
+                  <input type="text" value={link.label} onChange={(e) => setFooter({ ...footer, links: footer.links.map((l, i) => (i === index ? { ...l, label: e.target.value } : l)) })} className={`${inputClass} w-40`} placeholder="Label (HTML ok)" />
                   <input type="text" value={link.href} onChange={(e) => setFooter({ ...footer, links: footer.links.map((l, i) => (i === index ? { ...l, href: e.target.value } : l)) })} className={inputClass} placeholder="/privacy" />
                   {footer.links.length > 1 && <button type="button" onClick={() => setFooter({ ...footer, links: footer.links.filter((_, i) => i !== index) })} className="text-red-600 p-2"><Trash2 size={16} /></button>}
                 </div>
