@@ -232,12 +232,12 @@ export function ImageDetailView({ image, type, onClose, collectionData }) {
                 </>
               ) : (
                 <>
-                  {/* Uploaded Image */}
-                  {image.uploadedImageUrl && (
+                  {/* Ornament / product upload */}
+                  {(image.uploadedImageUrl || image.uploadedImagePath) && (
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                         <Upload size={18} />
-                        Uploaded Image
+                        Ornament / Uploaded Product
                       </h3>
                       <div className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
                         <SmartImage
@@ -245,7 +245,54 @@ export function ImageDetailView({ image, type, onClose, collectionData }) {
                           fallbackSrc={image.uploadedImageUrl}
                           fill
                           sizes="(max-width: 1024px) 100vw, 50vw"
-                          alt="Uploaded image"
+                          alt="Uploaded ornament"
+                          className="object-contain"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Campaign multi-ornament uploads */}
+                  {Array.isArray(image.uploadedOrnamentUrls) && image.uploadedOrnamentUrls.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                        <Upload size={18} />
+                        Uploaded Ornament Images
+                      </h3>
+                      <div className="grid grid-cols-2 gap-3">
+                        {image.uploadedOrnamentUrls.map((url, idx) => (
+                          <div
+                            key={`${url}-${idx}`}
+                            className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900"
+                          >
+                            <SmartImage
+                              src={url}
+                              fallbackSrc=""
+                              fill
+                              sizes="(max-width: 1024px) 50vw, 25vw"
+                              alt={`Ornament ${idx + 1}`}
+                              className="object-contain"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Model / reference image when URL exists */}
+                  {image.referenceImageUrl && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                        <ImageIcon size={18} />
+                        Model / Reference Image
+                      </h3>
+                      <div className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+                        <SmartImage
+                          src={image.referenceImagePath}
+                          fallbackSrc={image.referenceImageUrl}
+                          fill
+                          sizes="(max-width: 1024px) 100vw, 50vw"
+                          alt="Reference image"
                           className="object-contain"
                         />
                       </div>
@@ -267,22 +314,32 @@ export function ImageDetailView({ image, type, onClose, collectionData }) {
                     </div>
                   )}
 
-                  {/* Reference Images */}
-                  {image.referenceImageUrl && (
+                  {/* AI reference analysis text */}
+                  {image.referenceAnalysis && (
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                        <ImageIcon size={18} />
-                        Reference Image
+                        <Sparkles size={18} />
+                        AI Reference Analysis
                       </h3>
-                      <div className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
-                        <SmartImage
-                          src={image.referenceImagePath}
-                          fallbackSrc={image.referenceImageUrl}
-                          fill
-                          sizes="(max-width: 1024px) 100vw, 50vw"
-                          alt="Reference image"
-                          className="object-contain"
-                        />
+                      <div className="bg-violet-50 dark:bg-violet-900/20 rounded-lg p-4 border border-violet-200 dark:border-violet-800">
+                        <p className="text-sm text-violet-800 dark:text-violet-200 whitespace-pre-wrap">
+                          {image.referenceAnalysis}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dress analysis text */}
+                  {image.dressAnalysis && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                        <Palette size={18} />
+                        AI Dress Analysis
+                      </h3>
+                      <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
+                        <p className="text-sm text-amber-800 dark:text-amber-200 whitespace-pre-wrap">
+                          {image.dressAnalysis}
+                        </p>
                       </div>
                     </div>
                   )}
