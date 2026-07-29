@@ -21,6 +21,7 @@ const EMPTY_PLAN = {
   slug: '',
   description: '',
   price: 0,
+  price_usd: 0,
   price_display: '',
   currency: 'INR',
   billing_cycle: 'monthly',
@@ -145,6 +146,7 @@ export default function PricingAdminPage() {
       slug: plan.slug || plan.id || '',
       description: plan.description || '',
       price: plan.price || 0,
+      price_usd: plan.priceUsd ?? plan.price_usd ?? 0,
       price_display: plan.priceDisplay || '',
       currency: plan.currency || 'INR',
       billing_cycle: plan.billingCycle === 'month' ? 'monthly' : plan.billingCycle || 'monthly',
@@ -328,7 +330,16 @@ export default function PricingAdminPage() {
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">{plan.description}</p>
                 <p className="text-lg font-bold text-gray-900 dark:text-white mb-1">
-                  {plan.priceDisplay || (plan.price != null ? `₹${(plan.price || 0).toLocaleString('en-IN')}` : '—')}
+                  {plan.priceDisplay || (
+                    plan.price != null
+                      ? `₹${(plan.price || 0).toLocaleString('en-IN')}`
+                      : '—'
+                  )}
+                  {!plan.priceDisplay && plan.priceUsd != null && Number(plan.priceUsd) > 0 && (
+                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400 ml-2">
+                      / ${Number(plan.priceUsd).toLocaleString('en-US')}
+                    </span>
+                  )}
                 </p>
                 <p className="text-sm text-gray-500 mb-3">{plan.credits} · {plan.cta}</p>
                 <div className="flex gap-2">
@@ -506,6 +517,10 @@ export default function PricingAdminPage() {
                   <input type="number" value={formData.price} onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })} className="w-full rounded-lg border px-3 py-2 text-sm dark:bg-gray-800 dark:border-gray-700" />
                 </label>
                 <label className="space-y-1">
+                  <span className="text-sm font-medium">Price (USD)</span>
+                  <input type="number" step="0.01" value={formData.price_usd} onChange={(e) => setFormData({ ...formData, price_usd: parseFloat(e.target.value) || 0 })} className="w-full rounded-lg border px-3 py-2 text-sm dark:bg-gray-800 dark:border-gray-700" placeholder="59" />
+                </label>
+                <label className="space-y-1 col-span-2">
                   <span className="text-sm font-medium">Price display (e.g. Free, Custom)</span>
                   <input value={formData.price_display} onChange={(e) => setFormData({ ...formData, price_display: e.target.value })} placeholder="Free / Custom Pricing" className="w-full rounded-lg border px-3 py-2 text-sm dark:bg-gray-800 dark:border-gray-700" />
                 </label>
