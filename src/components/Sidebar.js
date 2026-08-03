@@ -212,6 +212,19 @@ export default function Sidebar() {
                     {isExpanded && (
                       <div className="ml-4 mt-1 space-y-1">
                         <Link
+                          href="/dashboard/home-page/blog"
+                          onClick={() => setIsMobileOpen(false)}
+                          className={`
+                            flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm
+                            ${pathname?.startsWith('/dashboard/home-page/blog')
+                              ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold'
+                              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                            }
+                          `}
+                        >
+                          <span className="ml-4">Blog</span>
+                        </Link>
+                        <Link
                           href="/dashboard/home-page/before-after"
                           onClick={() => setIsMobileOpen(false)}
                           className={`
@@ -238,9 +251,6 @@ export default function Sidebar() {
                         </Link>
                         <Link href="/dashboard/home-page/about" onClick={() => setIsMobileOpen(false)} className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm ${pathname === '/dashboard/home-page/about' ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                           <span className="ml-4">About</span>
-                        </Link>
-                        <Link href="/dashboard/home-page/blog" onClick={() => setIsMobileOpen(false)} className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm ${pathname === '/dashboard/home-page/blog' ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
-                          <span className="ml-4">Blog</span>
                         </Link>
                         <Link href="/dashboard/home-page/vision-mission" onClick={() => setIsMobileOpen(false)} className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm ${pathname === '/dashboard/home-page/vision-mission' ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                           <span className="ml-4">Vision & Mission</span>

@@ -25,11 +25,22 @@ const FOOTER_LOGO_PRESET = '/images/SplashLogoPNG.png';
 const ORIGINAL_FOOTER_DEFAULTS = {
   logo_url: FOOTER_LOGO_PRESET,
   copyright: '© 2025 Splash AI Studio',
-  links: [
-    { label: 'Instagram', href: 'https://www.instagram.com/splash_ai_studios/' },
-    { label: 'Privacy', href: '/privacy' },
-    { label: 'Terms', href: '/terms' },
-    { label: 'Contact', href: '/contact' },
+  link_rows: [
+    [
+      { label: 'Instagram', href: 'https://www.instagram.com/splash_ai_studios/' },
+      { label: 'About', href: '/about' },
+      { label: "FAQ's", href: '/faqs' },
+    ],
+    [
+      { label: 'Contact', href: '/contact' },
+      { label: 'Vision & Mission', href: '/vision-mision' },
+      { label: 'Pricing', href: '/pricing' },
+    ],
+    [
+      { label: 'Privacy', href: '/privacy' },
+      { label: 'Terms', href: '/terms' },
+      { label: 'Security', href: '/security' },
+    ],
   ],
 };
 
@@ -40,6 +51,22 @@ const emptyCapability = () => ({ tag: '', title: '', description: '', pills: [],
 const emptyWhoItem = () => ({ icon: 'Gem', title: '', description: '', pills: [] });
 const emptyTestimonial = () => ({ quote_html: '', initials: '', name: '', role: '' });
 const emptyFooterLink = () => ({ label: '', href: '' });
+const cloneFooterLinkRows = (rows) =>
+  (rows || []).map((row) => (Array.isArray(row) ? row.map((l) => ({ label: l.label ?? '', href: l.href ?? '' })) : []));
+const flattenFooterLinkRows = (rows) =>
+  (rows || []).flat().filter((l) => l?.label || l?.href);
+
+const normalizeAdminFooterLinkRows = (footerData) => {
+  if (Array.isArray(footerData?.link_rows) && footerData.link_rows.length > 0) {
+    const rows = cloneFooterLinkRows(footerData.link_rows).filter((row) => row.length > 0);
+    if (rows.length > 0) return rows;
+  }
+  if (Array.isArray(footerData?.links) && footerData.links.length >= 9) {
+    const flat = footerData.links.map((l) => ({ label: l.label ?? '', href: l.href ?? '' }));
+    return [flat.slice(0, 3), flat.slice(3, 6), flat.slice(6, 9)];
+  }
+  return cloneFooterLinkRows(ORIGINAL_FOOTER_DEFAULTS.link_rows);
+};
 
 const pillsToText = (pills) => (Array.isArray(pills) ? pills.join('\n') : '');
 const textToPills = (text) => text.split('\n').map((s) => s.trim()).filter(Boolean);
@@ -94,7 +121,11 @@ export default function HomeContentPage() {
     whatsapp_number: '',
     note: '',
   });
-  const [footer, setFooter] = useState({ ...ORIGINAL_FOOTER_DEFAULTS, links: ORIGINAL_FOOTER_DEFAULTS.links.map((l) => ({ ...l })) });
+  const [footer, setFooter] = useState({
+    logo_url: ORIGINAL_FOOTER_DEFAULTS.logo_url,
+    copyright: ORIGINAL_FOOTER_DEFAULTS.copyright,
+    link_rows: cloneFooterLinkRows(ORIGINAL_FOOTER_DEFAULTS.link_rows),
+  });
 
   useEffect(() => {
     load();
@@ -214,16 +245,12 @@ export default function HomeContentPage() {
         });
       }
       if (data.footer) {
-        const isLegacyLinks = data.footer.links && typeof data.footer.links === 'object' && !Array.isArray(data.footer.links);
-        const links = Array.isArray(data.footer.links) && data.footer.links.length && !isLegacyLinks
-          ? data.footer.links.map((l) => ({ label: l.label ?? '', href: l.href ?? '' }))
-          : ORIGINAL_FOOTER_DEFAULTS.links.map((l) => ({ ...l }));
         const logo = data.footer.logo_url;
         const usePresetLogo = !logo || logo === '/images/logo-splash.png' || logo === '/images/logo-Splash.png';
         setFooter({
           logo_url: usePresetLogo ? FOOTER_LOGO_PRESET : logo,
           copyright: data.footer.copyright ?? ORIGINAL_FOOTER_DEFAULTS.copyright,
-          links,
+          link_rows: normalizeAdminFooterLinkRows(data.footer),
         });
       }
     } catch (e) {
@@ -263,8 +290,17 @@ export default function HomeContentPage() {
           ...cta,
           whatsapp_href: buildWhatsappHref(cta.whatsapp_number),
         };
-      case 'footer':
-        return { ...footer, links: footer.links.filter((l) => l.label || l.href) };
+      case 'footer': {
+        const link_rows = (footer.link_rows || [])
+          .map((row) => (row || []).filter((l) => l.label || l.href))
+          .filter((row) => row.length > 0);
+        return {
+          logo_url: footer.logo_url,
+          copyright: footer.copyright,
+          link_rows,
+          links: flattenFooterLinkRows(link_rows),
+        };
+      }
       default:
         return null;
     }
@@ -552,7 +588,8 @@ export default function HomeContentPage() {
           <>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Footer</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Original homepage footer: logo, four links (Instagram, Privacy, Terms, Contact), and copyright.
+              Marketing footer shared on Home, About, FAQs, Contact, Vision & Mission, Pricing, Privacy, Terms, and Security.
+              Links are arranged in three rows (Blog is excluded for now).
             </p>
             <div>
               <label className={labelClass}>Logo URL</label>
@@ -576,19 +613,121 @@ export default function HomeContentPage() {
               <textarea value={footer.copyright} onChange={(e) => setFooter({ ...footer, copyright: e.target.value })} rows={2} className={inputClass} />
               <p className={hintClass}>Use &lt;br /&gt; for line breaks and &lt;em&gt; for italic/gold text.</p>
             </div>
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className={labelClass}>Footer links</label>
-                <button type="button" onClick={() => setFooter({ ...footer, links: [...footer.links, emptyFooterLink()] })} className="flex items-center gap-1 text-sm text-blue-600"><Plus size={14} /> Add link</button>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <label className={labelClass}>Footer link rows</label>
+                <button
+                  type="button"
+                  onClick={() => setFooter({ ...footer, link_rows: [...(footer.link_rows || []), [emptyFooterLink()]] })}
+                  className="flex items-center gap-1 text-sm text-blue-600"
+                >
+                  <Plus size={14} /> Add row
+                </button>
               </div>
-              <p className={hintClass + ' mb-2'}>Link labels support &lt;br /&gt; and &lt;em&gt; (italic/gold). Links/URLs stay plain text.</p>
-              {footer.links.map((link, index) => (
-                <div key={index} className="flex gap-2 mb-2">
-                  <input type="text" value={link.label} onChange={(e) => setFooter({ ...footer, links: footer.links.map((l, i) => (i === index ? { ...l, label: e.target.value } : l)) })} className={`${inputClass} w-40`} placeholder="Label (HTML ok)" />
-                  <input type="text" value={link.href} onChange={(e) => setFooter({ ...footer, links: footer.links.map((l, i) => (i === index ? { ...l, href: e.target.value } : l)) })} className={inputClass} placeholder="/privacy" />
-                  {footer.links.length > 1 && <button type="button" onClick={() => setFooter({ ...footer, links: footer.links.filter((_, i) => i !== index) })} className="text-red-600 p-2"><Trash2 size={16} /></button>}
+              <p className={hintClass}>
+                Default layout: Row 1 = Instagram, About, FAQ&apos;s · Row 2 = Contact, Vision & Mission, Pricing · Row 3 = Privacy, Terms, Security.
+                Labels support HTML (&lt;em&gt;). Paths/URLs stay plain text.
+              </p>
+              {(footer.link_rows || []).map((row, rowIndex) => (
+                <div key={`footer-row-${rowIndex}`} className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Row {rowIndex + 1}</h3>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFooter({
+                            ...footer,
+                            link_rows: footer.link_rows.map((r, i) => (i === rowIndex ? [...r, emptyFooterLink()] : r)),
+                          })
+                        }
+                        className="flex items-center gap-1 text-sm text-blue-600"
+                      >
+                        <Plus size={14} /> Add link
+                      </button>
+                      {(footer.link_rows || []).length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFooter({
+                              ...footer,
+                              link_rows: footer.link_rows.filter((_, i) => i !== rowIndex),
+                            })
+                          }
+                          className="text-red-600 p-1"
+                          title="Remove row"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {(row || []).map((link, linkIndex) => (
+                    <div key={`footer-link-${rowIndex}-${linkIndex}`} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={link.label}
+                        onChange={(e) =>
+                          setFooter({
+                            ...footer,
+                            link_rows: footer.link_rows.map((r, ri) =>
+                              ri === rowIndex
+                                ? r.map((l, li) => (li === linkIndex ? { ...l, label: e.target.value } : l))
+                                : r
+                            ),
+                          })
+                        }
+                        className={`${inputClass} w-44`}
+                        placeholder="Label"
+                      />
+                      <input
+                        type="text"
+                        value={link.href}
+                        onChange={(e) =>
+                          setFooter({
+                            ...footer,
+                            link_rows: footer.link_rows.map((r, ri) =>
+                              ri === rowIndex
+                                ? r.map((l, li) => (li === linkIndex ? { ...l, href: e.target.value } : l))
+                                : r
+                            ),
+                          })
+                        }
+                        className={inputClass}
+                        placeholder="/about"
+                      />
+                      {(row || []).length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFooter({
+                              ...footer,
+                              link_rows: footer.link_rows.map((r, ri) =>
+                                ri === rowIndex ? r.filter((_, li) => li !== linkIndex) : r
+                              ),
+                            })
+                          }
+                          className="text-red-600 p-2"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
                 </div>
               ))}
+              <button
+                type="button"
+                onClick={() =>
+                  setFooter({
+                    ...footer,
+                    link_rows: cloneFooterLinkRows(ORIGINAL_FOOTER_DEFAULTS.link_rows),
+                  })
+                }
+                className="text-sm text-gray-600 dark:text-gray-400 underline underline-offset-2"
+              >
+                Reset links to defaults
+              </button>
             </div>
           </>
         )}

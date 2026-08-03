@@ -169,14 +169,14 @@ function isTokenRelatedError(error) {
   );
 }
 
-async function uploadMultipart(endpoint, formData) {
+async function uploadMultipart(endpoint, formData, method = 'POST') {
   const url = `${API_BASE_URL}${endpoint}`;
   const token = typeof window !== 'undefined'
     ? (localStorage.getItem('auth_token') || localStorage.getItem('token'))
     : null;
 
   const response = await fetch(url, {
-    method: 'POST',
+    method,
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,
   });
@@ -186,12 +186,13 @@ async function uploadMultipart(endpoint, formData) {
     throw new Error('Authentication failed. Please login again.');
   }
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || errorData.message || `API Error: ${response.statusText}`);
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok || data.status === false) {
+    throw new Error(data.error || data.message || `API Error: ${response.statusText}`);
   }
 
-  return response.json();
+  return data;
 }
 
 /**
@@ -382,22 +383,42 @@ export const homepageAPI = {
     body: JSON.stringify({ content })
   }),
 
-  // Blog (public - for reference; admin uses below)
-  getBlogPosts: () => apiRequest('/api/homepage/blog/'),
-  getBlogPost: (slug) => apiRequest(`/api/homepage/blog/${slug}/`),
-  // Blog (admin)
-  getAllBlogPosts: () => apiRequest('/api/homepage/blog/admin/all/'),
-  createBlogPost: (data) => apiRequest('/api/homepage/blog/admin/create/', {
-    method: 'POST',
-    body: JSON.stringify(data)
-  }),
-  updateBlogPost: (slug, data) => apiRequest(`/api/homepage/blog/admin/${slug}/update/`, {
-    method: 'PUT',
-    body: JSON.stringify(data)
-  }),
-  deleteBlogPost: (slug) => apiRequest(`/api/homepage/blog/admin/${slug}/delete/`, {
-    method: 'DELETE'
-  }),
+  // Blog (admin — /admin/blog/*)
+  listBlogs: (page = 1, query = '') => {
+    const params = new URLSearchParams({ page: String(page) });
+    if (query && String(query).trim()) params.set('query', String(query).trim());
+    return apiRequest(`/admin/blog/listing?${params.toString()}`);
+  },
+  getBlogDetails: (id) => apiRequest(`/admin/blog/details/${id}`),
+  createBlog: (formData) => uploadMultipart('/admin/blog/add', formData, 'POST'),
+  updateBlog: (id, formData) => uploadMultipart(`/admin/blog/update/${id}`, formData, 'POST'),
+  deleteBlog: (id) => apiRequest(`/admin/blog/delete/${id}`, { method: 'DELETE' }),
+  downloadBlog: async (id) => {
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+    const token =
+      (typeof window !== 'undefined' &&
+        (localStorage.getItem('auth_token') || localStorage.getItem('token'))) ||
+      '';
+    const res = await fetch(`${API_BASE}/admin/blog/download/${id}`, {
+      method: 'GET',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+      let message = 'Download failed';
+      try {
+        const data = await res.json();
+        message = data.message || message;
+      } catch (_) {
+        /* ignore */
+      }
+      throw new Error(message);
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') || '';
+    const match = disposition.match(/filename="?([^"]+)"?/i);
+    const filename = match?.[1] || `blog-${id}.html`;
+    return { blob, filename };
+  },
 
   // Admin: Get all support & contact form requests
   getAllSupportRequests: () => apiRequest('/api/homepage/support/all/'),
