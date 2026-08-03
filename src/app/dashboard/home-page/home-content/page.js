@@ -30,6 +30,7 @@ const ORIGINAL_FOOTER_DEFAULTS = {
       { label: 'Instagram', href: 'https://www.instagram.com/splash_ai_studios/' },
       { label: 'About', href: '/about' },
       { label: "FAQ's", href: '/faqs' },
+      { label: 'Blogs', href: '/blog' },
     ],
     [
       { label: 'Contact', href: '/contact' },
@@ -588,8 +589,8 @@ export default function HomeContentPage() {
           <>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Footer</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Marketing footer shared on Home, About, FAQs, Contact, Vision & Mission, Pricing, Privacy, Terms, and Security.
-              Links are arranged in three rows (Blog is excluded for now).
+              Marketing footer shared on Home, About, FAQs, Contact, Vision & Mission, Pricing, Privacy, Terms, Security, and Blog pages.
+              Links are arranged in rows (include Blogs → /blog).
             </p>
             <div>
               <label className={labelClass}>Logo URL</label>
