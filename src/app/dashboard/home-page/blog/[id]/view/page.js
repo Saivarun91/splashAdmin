@@ -6,10 +6,18 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Download, Loader2, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { homepageAPI } from '@/lib/api';
+import { buildMediaUrl } from '@/utils/imagehelper';
 import {
   BLOG_RENDERED_CONTENT_CLASS,
   BLOG_RENDERED_CONTENT_CSS,
 } from '@/lib/blogContentStyles';
+import { sanitizeBlogEditorHtml } from '@/lib/sanitizeBlogEditorHtml';
+
+function mediaSrc(src) {
+  if (!src) return '';
+  if (/^https?:\/\//i.test(src) || src.startsWith('blob:')) return src;
+  return buildMediaUrl(src);
+}
 
 export default function BlogViewPage() {
   const params = useParams();
@@ -125,7 +133,7 @@ export default function BlogViewPage() {
         {blog.picture ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={blog.picture}
+            src={mediaSrc(blog.picture)}
             alt=""
             className="w-full object-cover"
             style={{ maxHeight: 420 }}
@@ -139,7 +147,7 @@ export default function BlogViewPage() {
 
           <div
             className={BLOG_RENDERED_CONTENT_CLASS}
-            dangerouslySetInnerHTML={{ __html: blog.full_content || '' }}
+            dangerouslySetInnerHTML={{ __html: sanitizeBlogEditorHtml(blog.full_content || '') }}
           />
 
           {faqs.length > 0 ? (

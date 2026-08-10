@@ -8,6 +8,8 @@ import toast from 'react-hot-toast';
 import { homepageAPI } from '@/lib/api';
 import ImageCropModal from '@/components/ImageCropModal';
 import BlogDescriptionEditor from './BlogDescriptionEditor';
+import { sanitizeBlogEditorHtml } from '@/lib/sanitizeBlogEditorHtml';
+import { buildMediaUrl, isHttpUrl } from '@/utils/imagehelper';
 
 const emptyFaq = () => ({ id: undefined, question: '', answer: '' });
 
@@ -32,6 +34,21 @@ function isHtmlEmpty(html) {
     .replace(/\s+/g, ' ')
     .trim();
   return text === '';
+}
+
+function resolveBlogHtmlMediaUrls(html) {
+  if (!html) return html;
+  return html.replace(
+    /(<img\b[^>]*\ssrc=["'])(\/media\/[^"']+)(["'])/gi,
+    (_, pre, src, post) => `${pre}${buildMediaUrl(src)}${post}`
+  );
+}
+
+/** Resolve cover preview src for admin (blob / absolute / /media/...). */
+function resolvePictureSrc(src) {
+  if (!src) return '';
+  if (src.startsWith('blob:') || isHttpUrl(src)) return src;
+  return buildMediaUrl(src);
 }
 
 export default function BlogForm({ mode = 'create', blogId = null }) {
@@ -94,11 +111,12 @@ export default function BlogForm({ mode = 'create', blogId = null }) {
           slug: blog.slug || '',
           author: blog.author || '',
           short_content: blog.short_content || '',
-          full_content: blog.full_content || '',
+          full_content: resolveBlogHtmlMediaUrls(blog.full_content || ''),
           status: blog.status || 'Published',
           faqs,
         });
         setExistingPicture(blog.picture || '');
+        // Keep stored path as-is; resolve to API media URL at render time
         setPicturePreview(blog.picture || '');
         slugTouched.current = Boolean(blog.slug);
       } catch (e) {
@@ -186,7 +204,10 @@ export default function BlogForm({ mode = 'create', blogId = null }) {
       URL.revokeObjectURL(picturePreview);
     }
     setPictureFile(null);
-    setPicturePreview(mode === 'edit' ? existingPicture : '');
+    setPicturePreview('');
+    // Keep existingPicture so edit save still works if no replacement is chosen.
+    // Reset the file input so the same file can be selected again.
+    if (coverFileInputRef.current) coverFileInputRef.current.value = '';
   };
 
   const handleInlineImage = async (file) => {
@@ -221,7 +242,7 @@ export default function BlogForm({ mode = 'create', blogId = null }) {
   };
 
   const prepareFullContent = (html) => {
-    let content = html || '';
+    let content = sanitizeBlogEditorHtml(html || '');
     const attachments = [];
     Object.entries(inlineImagesRef.current).forEach(([blobUrl, meta]) => {
       if (content.includes(blobUrl)) {
@@ -272,6 +293,7 @@ export default function BlogForm({ mode = 'create', blogId = null }) {
     fd.append('mete_title', form.mete_title.trim());
     fd.append('meta_description', form.meta_description.trim());
     fd.append('meta_keyword', form.meta_keyword.trim());
+    fd.append('robots', 'index,follow');
     fd.append('title', form.title.trim());
     fd.append('is_trending', form.is_trending ? '1' : '0');
     fd.append('slug', slug);
@@ -311,6 +333,16 @@ export default function BlogForm({ mode = 'create', blogId = null }) {
     try {
       setSaving(true);
       const fd = buildFormData();
+      console.log(
+        'Blog save payload:',
+        [...fd.entries()].map(([key, value]) => ({
+          key,
+          value:
+            value instanceof File
+              ? { name: value.name, size: value.size, type: value.type }
+              : value,
+        }))
+      );
       if (mode === 'create') {
         const res = await homepageAPI.createBlog(fd);
         toast.success(res.message || 'Blog created');
@@ -442,15 +474,15 @@ export default function BlogForm({ mode = 'create', blogId = null }) {
               <div className="relative inline-block">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={picturePreview}
+                  src={resolvePictureSrc(picturePreview)}
                   alt="Cover preview"
-                  className="h-32 w-48 rounded-lg border border-gray-200 object-cover"
+                  className="h-32 w-48 rounded-lg border border-gray-200 object-cover bg-gray-50"
                 />
                 <button
                   type="button"
                   onClick={clearPicture}
                   className="absolute -right-2 -top-2 rounded-full bg-white p-1 text-gray-600 shadow ring-1 ring-gray-200 hover:text-red-600"
-                  title="Remove image"
+                  title="Remove image so you can upload a new one"
                 >
                   <X size={14} />
                 </button>

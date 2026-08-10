@@ -416,7 +416,7 @@ export const homepageAPI = {
     const blob = await res.blob();
     const disposition = res.headers.get('Content-Disposition') || '';
     const match = disposition.match(/filename="?([^"]+)"?/i);
-    const filename = match?.[1] || `blog-${id}.html`;
+    const filename = match?.[1] || `blog-${id}.pdf`;
     return { blob, filename };
   },
 
@@ -600,6 +600,14 @@ export const creditsAPI = {
   updateSettings: (data) => apiRequest('/api/credits/admin/settings/update/', {
     method: 'PUT',
     body: JSON.stringify(data)
+  }),
+};
+
+export const aiGenerationAPI = {
+  getStatus: () => apiRequest('/api/credits/admin/ai-generation/'),
+  setDisabled: (disabled) => apiRequest('/api/credits/admin/ai-generation/', {
+    method: 'PUT',
+    body: JSON.stringify({ disabled }),
   }),
 };
 

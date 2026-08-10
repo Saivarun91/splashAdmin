@@ -80,21 +80,240 @@ export const BLOG_RENDERED_CONTENT_CSS = `
   margin: 0 0 0.85rem 1rem;
 }
 
+.${BLOG_RENDERED_CONTENT_CLASS} img.blog-img-center {
+  display: block;
+  float: none;
+  clear: both;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.${BLOG_RENDERED_CONTENT_CLASS} figure.blog-figure {
+  margin: 0.85rem 0;
+  max-width: 100%;
+  height: auto;
+  display: flex;
+  gap: 0.65rem;
+}
+.${BLOG_RENDERED_CONTENT_CLASS} figure.blog-figure img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  float: none !important;
+  margin: 0 !important;
+}
+.${BLOG_RENDERED_CONTENT_CLASS} .blog-image-row figure.blog-figure img,
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] figure.blog-figure img {
+  width: auto;
+  max-width: none;
+}
+.${BLOG_RENDERED_CONTENT_CLASS} figure.blog-figure--below { flex-direction: column; }
+.${BLOG_RENDERED_CONTENT_CLASS} figure.blog-figure--above { flex-direction: column-reverse; }
+.${BLOG_RENDERED_CONTENT_CLASS} figure.blog-figure--left { flex-direction: row-reverse; align-items: center; }
+.${BLOG_RENDERED_CONTENT_CLASS} figure.blog-figure--right { flex-direction: row; align-items: center; }
+.${BLOG_RENDERED_CONTENT_CLASS} figure.blog-figure.blog-img-left,
+.${BLOG_RENDERED_CONTENT_CLASS} figure.blog-figure.blog-img-wrap {
+  float: left;
+  margin: 0 1rem 0.85rem 0;
+}
+.${BLOG_RENDERED_CONTENT_CLASS} figure.blog-figure.blog-img-right {
+  float: right;
+  margin: 0 0 0.85rem 1rem;
+}
+.${BLOG_RENDERED_CONTENT_CLASS} figure.blog-figure.blog-img-center {
+  display: flex;
+  float: none;
+  clear: both;
+  margin-left: auto;
+  margin-right: auto;
+}
+.${BLOG_RENDERED_CONTENT_CLASS} .blog-figcaption,
+.${BLOG_RENDERED_CONTENT_CLASS} figure.blog-figure figcaption {
+  font-size: 0.9em;
+  line-height: 1.45;
+  color: #4b5563;
+  margin: 0;
+}
+.${BLOG_RENDERED_CONTENT_CLASS} figure.blog-figure > p,
+.${BLOG_RENDERED_CONTENT_CLASS} figure.blog-figure > h1,
+.${BLOG_RENDERED_CONTENT_CLASS} figure.blog-figure > h2,
+.${BLOG_RENDERED_CONTENT_CLASS} figure.blog-figure > h3,
+.${BLOG_RENDERED_CONTENT_CLASS} figure.blog-figure > h4 {
+  margin: 0.25em 0;
+  flex: 1 1 auto;
+  min-width: 120px;
+}
+
 .${BLOG_RENDERED_CONTENT_CLASS} .blog-image-row,
-.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] {
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row],
+.${BLOG_RENDERED_CONTENT_CLASS} .blog-card-row,
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-card-row] {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   align-items: flex-start;
+  justify-content: flex-start;
   margin: 0.85rem 0;
   clear: both;
   width: 100%;
 }
+.${BLOG_RENDERED_CONTENT_CLASS} .blog-image-row,
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] {
+  flex-wrap: nowrap;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.${BLOG_RENDERED_CONTENT_CLASS} .blog-image-row > figure,
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] > figure,
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] > [data-image-text] {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 !important;
+  float: none !important;
+  clear: none !important;
+  box-sizing: border-box;
+}
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] > figure img,
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] > [data-image-text] img {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  display: block !important;
+  margin: 0 !important;
+  float: none !important;
+  clear: none !important;
+}
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] > figure h1,
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] > figure h2,
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] > figure h3,
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] > figure h4,
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] > figure p {
+  width: 100%;
+  text-align: center;
+  margin: 0.35em 0 0;
+}
+.${BLOG_RENDERED_CONTENT_CLASS} .blog-image-row > img,
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] > img {
+  flex: 0 1 var(--saved-width, auto);
+  min-width: 0;
+  max-width: var(--saved-width, 100%);
+}
+@media (min-width: 1024px) {
+  .${BLOG_RENDERED_CONTENT_CLASS} .blog-image-row > figure,
+  .${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] > figure,
+  .${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] > [data-image-text] {
+    flex: 0 1 var(--saved-width, auto);
+    max-width: var(--saved-width, 100%);
+  }
+}
+@media (max-width: 1023px) {
+  .${BLOG_RENDERED_CONTENT_CLASS} .blog-image-row,
+  .${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    justify-content: stretch;
+  }
+  .${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row]:has(> :nth-child(1):last-child) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] > img,
+  .${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] > figure,
+  .${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] > [data-image-text] {
+    flex: unset;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] > img {
+    width: 100%;
+    max-width: 100%;
+  }
+  .${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] > figure h1,
+  .${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] > figure h2,
+  .${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] > figure h3,
+  .${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] > figure h4,
+  .${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] > figure p {
+    font-size: 0.82rem;
+    line-height: 1.4;
+    white-space: normal;
+    overflow-wrap: break-word;
+  }
+  .${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] > figure h3 span,
+  .${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] > figure h4 span {
+    font-size: inherit;
+    line-height: inherit;
+  }
+}
+.${BLOG_RENDERED_CONTENT_CLASS} .blog-image-row--center,
+.${BLOG_RENDERED_CONTENT_CLASS} .blog-card-row--center,
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row][data-align="center"],
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-card-row][data-align="center"] {
+  justify-content: center;
+  margin-left: auto;
+  margin-right: auto;
+}
+.${BLOG_RENDERED_CONTENT_CLASS} .blog-image-row--right,
+.${BLOG_RENDERED_CONTENT_CLASS} .blog-card-row--right,
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row][data-align="right"],
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-card-row][data-align="right"] {
+  justify-content: flex-end;
+}
 .${BLOG_RENDERED_CONTENT_CLASS} .blog-image-row img,
-.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] img {
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] img,
+.${BLOG_RENDERED_CONTENT_CLASS} .blog-image-row figure,
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] figure {
   float: none !important;
   margin: 0 !important;
   clear: none !important;
+}
+.${BLOG_RENDERED_CONTENT_CLASS} .blog-image-row img.blog-img-top,
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] img.blog-img-top,
+.${BLOG_RENDERED_CONTENT_CLASS} .blog-image-row img.blog-img-left,
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] img.blog-img-left,
+.${BLOG_RENDERED_CONTENT_CLASS} .blog-image-row img.blog-img-right,
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] img.blog-img-right,
+.${BLOG_RENDERED_CONTENT_CLASS} .blog-image-row img.blog-img-wrap,
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] img.blog-img-wrap,
+.${BLOG_RENDERED_CONTENT_CLASS} .blog-image-row img.blog-img-center,
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] img.blog-img-center {
+  display: block !important;
+  float: none !important;
+  clear: none !important;
+  margin: 0 !important;
+}
+.${BLOG_RENDERED_CONTENT_CLASS} .blog-image-row figure.blog-figure,
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-image-row] figure.blog-figure {
+  float: none !important;
+  clear: none !important;
+  margin: 0 !important;
+}
+.${BLOG_RENDERED_CONTENT_CLASS} .blog-card,
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-blog-card] {
+  flex: 1 1 180px;
+  min-width: 160px;
+  max-width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 0.75rem 0.85rem;
+  background: #f9fafb;
+}
+.${BLOG_RENDERED_CONTENT_CLASS} .blog-card img,
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-blog-card] img {
+  float: none !important;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 0 0.5rem !important;
+}
+.${BLOG_RENDERED_CONTENT_CLASS} .blog-card h4,
+.${BLOG_RENDERED_CONTENT_CLASS} div[data-blog-card] h4 {
+  margin-top: 0.25rem;
 }
 
 .${BLOG_RENDERED_CONTENT_CLASS} .tableWrapper {

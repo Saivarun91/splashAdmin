@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Loader2, Pencil, Plus, Trash2, Search, Eye, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { homepageAPI } from '@/lib/api';
+import { buildMediaUrl } from '@/utils/imagehelper';
 
 export default function BlogAdminListingPage() {
   const router = useRouter();
@@ -172,7 +173,15 @@ export default function BlogAdminListingPage() {
                   <td className="px-4 py-3">
                     {row.picture ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={row.picture} alt="" className="h-12 w-16 rounded object-cover" />
+                      <img
+                        src={
+                          /^https?:\/\//i.test(row.picture)
+                            ? row.picture
+                            : buildMediaUrl(row.picture)
+                        }
+                        alt=""
+                        className="h-12 w-16 rounded object-cover"
+                      />
                     ) : (
                       <span className="text-gray-400">—</span>
                     )}

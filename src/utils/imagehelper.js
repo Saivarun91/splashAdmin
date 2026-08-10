@@ -2,6 +2,14 @@ export function isHttpUrl(src) {
   return /^https?:\/\//i.test(src || "");
 }
 
+function getApiBaseUrl() {
+  return (
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    "http://127.0.0.1:8000"
+  ).replace(/\/$/, "");
+}
+
 export function buildMediaUrl(src) {
   if (!src) return "";
 
@@ -9,12 +17,9 @@ export function buildMediaUrl(src) {
     return src;
   }
 
-  const API_URL =
-    process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+  const baseUrl = getApiBaseUrl();
 
-  const baseUrl = API_URL.replace(/\/$/, "");
-
-  let cleanPath = src.trim().replace(/\\/g, "/");
+  let cleanPath = String(src).trim().replace(/\\/g, "/");
 
   const mediaIndex = cleanPath.toLowerCase().indexOf("/media/");
 

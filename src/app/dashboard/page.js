@@ -15,8 +15,9 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { Building2, Image as ImageIcon, TrendingUp, Users, Activity, Zap, DollarSign, BarChart3, Calendar, X } from 'lucide-react';
-import { dashboardAPI, organizationAPI } from '@/lib/api';
+import { Building2, Image as ImageIcon, TrendingUp, Users, Activity, Zap, DollarSign, BarChart3, Calendar, X, Power } from 'lucide-react';
+import { dashboardAPI, organizationAPI, aiGenerationAPI } from '@/lib/api';
+import { Switch } from '@/components/ui/switch';
 // import { useEffect } from 'react';
 
 // All data is now fetched dynamically from the backend
@@ -41,6 +42,9 @@ export default function Dashboard() {
   });
   const [useCustomDates, setUseCustomDates] = useState(false);
   const [chartLoading, setChartLoading] = useState(false);
+  const [aiGenerationDisabled, setAiGenerationDisabled] = useState(false);
+  const [aiToggleLoading, setAiToggleLoading] = useState(true);
+  const [aiToggleSaving, setAiToggleSaving] = useState(false);
 
   // Fetch dashboard stats and organizations on component mount
   useEffect(() => {
@@ -85,6 +89,37 @@ export default function Dashboard() {
     };
     fetchData();
   }, []);
+
+  useEffect(() => {
+    const fetchAiStatus = async () => {
+      setAiToggleLoading(true);
+      try {
+        const response = await aiGenerationAPI.getStatus();
+        if (response?.success) {
+          setAiGenerationDisabled(Boolean(response.disabled));
+        }
+      } catch (error) {
+        console.error('Failed to fetch AI generation status:', error);
+      } finally {
+        setAiToggleLoading(false);
+      }
+    };
+    fetchAiStatus();
+  }, []);
+
+  const handleAiGenerationToggle = async (checked) => {
+    setAiToggleSaving(true);
+    try {
+      const response = await aiGenerationAPI.setDisabled(checked);
+      if (response?.success) {
+        setAiGenerationDisabled(Boolean(response.disabled));
+      }
+    } catch (error) {
+      console.error('Failed to update AI generation status:', error);
+    } finally {
+      setAiToggleSaving(false);
+    }
+  };
 
   // Fetch initial chart data when component mounts (only for default timeRange)
   useEffect(() => {
@@ -218,9 +253,40 @@ export default function Dashboard() {
               Comprehensive overview of your platform analytics
             </p>
           </div>
-          <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-            <Activity className="text-blue-600 dark:text-blue-400" size={20} />
-            <span className="text-sm font-medium text-blue-900 dark:text-blue-300">Live Data</span>
+          <div className="flex flex-col items-stretch sm:items-end gap-3">
+            <div className={`rounded-lg border px-4 py-3 min-w-[260px] ${
+              aiGenerationDisabled
+                ? 'border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-950/20'
+                : 'border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20'
+            }`}>
+              <p className={`text-xs mb-2 ${
+                aiGenerationDisabled
+                  ? 'text-red-700 dark:text-red-300'
+                  : 'text-emerald-700 dark:text-emerald-300'
+              }`}>
+                {aiGenerationDisabled
+                  ? 'Users cannot generate images while this is enabled.'
+                  : 'Users can generate images.'}
+              </p>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Power size={16} className={aiGenerationDisabled ? 'text-red-600' : 'text-emerald-600'} />
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    Disable AI Server
+                  </span>
+                </div>
+                <Switch
+                  checked={aiGenerationDisabled}
+                  onCheckedChange={handleAiGenerationToggle}
+                  disabled={aiToggleLoading || aiToggleSaving}
+                  aria-label="Disable AI server for all users"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800 self-end">
+              <Activity className="text-blue-600 dark:text-blue-400" size={20} />
+              <span className="text-sm font-medium text-blue-900 dark:text-blue-300">Live Data</span>
+            </div>
           </div>
         </div>
 

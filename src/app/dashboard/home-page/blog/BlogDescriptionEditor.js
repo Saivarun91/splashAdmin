@@ -2,16 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
-import { Node } from '@tiptap/core';
-import { NodeSelection } from '@tiptap/pm/state';
+import { Extension, Node, mergeAttributes } from '@tiptap/core';
+import { NodeSelection, TextSelection } from '@tiptap/pm/state';
 import { StarterKit } from '@tiptap/starter-kit';
 import { Image as TiptapImage } from '@tiptap/extension-image';
 import { TextAlign } from '@tiptap/extension-text-align';
 import { TextStyle, Color, FontSize } from '@tiptap/extension-text-style';
 import { Highlight } from '@tiptap/extension-highlight';
+import { Underline } from '@tiptap/extension-underline';
 import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table';
 import { BulletList, OrderedList } from '@tiptap/extension-list';
 import { Placeholder } from '@tiptap/extension-placeholder';
+import Link from '@tiptap/extension-link';
 import {
   Bold,
   Italic,
@@ -43,13 +45,46 @@ import {
   PanelLeft,
   PanelRight,
   Square,
+  Rows3,
+  LayoutGrid,
+  Type,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import {
   BLOG_RENDERED_CONTENT_CLASS,
   BLOG_RENDERED_CONTENT_CSS,
 } from '@/lib/blogContentStyles';
+import { sanitizeBlogEditorHtml } from '@/lib/sanitizeBlogEditorHtml';
 
 const ICON = '#3B82F6';
+
+const LINK_REL_NOFOLLOW = 'noopener noreferrer nofollow';
+const LINK_REL_DOFOLLOW = 'noopener noreferrer';
+
+function linkFollowFromRel(rel) {
+  return String(rel || '').includes('nofollow') ? 'nofollow' : 'dofollow';
+}
+
+function relFromLinkFollow(follow) {
+  return follow === 'dofollow' ? LINK_REL_DOFOLLOW : LINK_REL_NOFOLLOW;
+}
+
+const BlogLink = Link.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      rel: {
+        default: LINK_REL_NOFOLLOW,
+        parseHTML: (element) => element.getAttribute('rel'),
+        renderHTML: (attributes) => {
+          if (!attributes.rel) return {};
+          return { rel: attributes.rel };
+        },
+      },
+    };
+  },
+});
 
 const BULLET_STYLES = [
   { value: 'disc', label: 'Disc', sample: '•' },
@@ -71,6 +106,19 @@ const ORDERED_STYLES = [
 ];
 
 const FONT_SIZES = ['8', '9', '10', '11', '12', '13', '14', '16', '18', '24', '32'];
+
+const CAPTION_POSITIONS = [
+  { value: 'below', label: 'Text below image' },
+  { value: 'above', label: 'Text above image' },
+  { value: 'left', label: 'Text left of image' },
+  { value: 'right', label: 'Text right of image' },
+];
+
+const ROW_ALIGN_JUSTIFY = {
+  left: 'flex-start',
+  center: 'center',
+  right: 'flex-end',
+};
 
 const listStyleAttribute = {
   listStyleType: {
@@ -95,11 +143,19 @@ const StyledOrderedList = OrderedList.extend({
   },
 });
 
+const BlogEditorBridge = Extension.create({
+  name: 'blogEditorBridge',
+  addStorage() {
+    return { onInlineImage: null };
+  },
+});
+
 const LAYOUT_CSS = {
   left: 'float:left;margin:0 1rem 0.85rem 0;',
   right: 'float:right;margin:0 0 0.85rem 1rem;',
   top: 'display:block;float:none;margin:0.85rem 0;clear:both;',
   wrap: 'float:left;margin:0 1rem 0.85rem 0;',
+  center: 'display:block;float:none;margin:0.85rem auto;clear:both;',
 };
 
 function clampImageWidth(w, maxW = 1400) {
@@ -107,27 +163,59 @@ function clampImageWidth(w, maxW = 1400) {
   return Math.max(40, Math.min(n, maxW));
 }
 
-/** Side-by-side image strip — drop images next to each other into this row. */
+function rowAlignStyle(align = 'left') {
+  const justify = ROW_ALIGN_JUSTIFY[align] || ROW_ALIGN_JUSTIFY.left;
+  return `display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;justify-content:${justify};margin:0.85rem 0;clear:both;width:100%;`;
+}
+
+function readNaturalWidth(src) {
+  return new Promise((resolve) => {
+    if (!src) {
+      resolve(360);
+      return;
+    }
+    const img = new window.Image();
+    img.onload = () => resolve(clampImageWidth(img.naturalWidth || 360));
+    img.onerror = () => resolve(360);
+    img.src = src;
+  });
+}
+
+
+/** Side-by-side image strip — unlimited images / image+text blocks. */
 const ImageRow = Node.create({
   name: 'imageRow',
   group: 'block',
-  content: 'image{1,4}',
+  content: '(image | imageTextBlock)+',
   defining: true,
   isolating: true,
+  draggable: true,
+  selectable: true,
+
+  addAttributes() {
+    return {
+      align: {
+        default: 'left',
+        parseHTML: (el) => el.getAttribute('data-align') || 'left',
+        renderHTML: (attrs) => ({ 'data-align': attrs.align || 'left' }),
+      },
+    };
+  },
 
   parseHTML() {
     return [{ tag: 'div[data-image-row]' }];
   },
 
-  renderHTML({ HTMLAttributes }) {
+  renderHTML({ HTMLAttributes, node }) {
+    const align = node?.attrs?.align || HTMLAttributes['data-align'] || 'left';
     return [
       'div',
-      {
-        ...HTMLAttributes,
+      mergeAttributes(HTMLAttributes, {
         'data-image-row': '',
-        class: 'blog-image-row',
-        style: 'display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;margin:0.85rem 0;clear:both;',
-      },
+        'data-align': align,
+        class: `blog-image-row blog-image-row--${align}`,
+        style: rowAlignStyle(align),
+      }),
       0,
     ];
   },
@@ -135,9 +223,9 @@ const ImageRow = Node.create({
   addCommands() {
     return {
       setImageRow:
-        (images) =>
+        (images, align = 'left') =>
         ({ commands }) => {
-          const content = (images || []).slice(0, 4).map((attrs) => ({
+          const content = (images || []).map((attrs) => ({
             type: 'image',
             attrs: {
               src: attrs.src,
@@ -146,165 +234,489 @@ const ImageRow = Node.create({
               layout: 'top',
             },
           }));
-          if (content.length < 2) return false;
-          return commands.insertContent({ type: this.name, content });
+          if (content.length < 1) return false;
+          return commands.insertContent({
+            type: this.name,
+            attrs: { align },
+            content,
+          });
         },
     };
   },
 });
 
-function findImageNearPos(doc, pos) {
-  const $pos = doc.resolve(Math.max(0, Math.min(pos, doc.content.size)));
-  for (let depth = $pos.depth; depth > 0; depth -= 1) {
-    const node = $pos.node(depth);
-    if (node.type.name === 'image') {
-      return { pos: $pos.before(depth), node };
-    }
-    if (node.type.name === 'imageRow') {
-      return { pos: $pos.before(depth), node, isRow: true };
-    }
-  }
-  // Check node right after / before
-  const after = $pos.nodeAfter;
-  if (after?.type.name === 'image') return { pos: $pos.pos, node: after };
-  if (after?.type.name === 'imageRow') return { pos: $pos.pos, node: after, isRow: true };
-  const before = $pos.nodeBefore;
-  if (before?.type.name === 'image') return { pos: $pos.pos - before.nodeSize, node: before };
-  if (before?.type.name === 'imageRow') {
-    return { pos: $pos.pos - before.nodeSize, node: before, isRow: true };
-  }
-  return null;
-}
+/**
+ * Image + real editable text (paragraph/heading) so font size/style toolbar works.
+ * Replaces plain string captions.
+ */
+const ImageTextBlock = Node.create({
+  name: 'imageTextBlock',
+  group: 'block',
+  content: 'image (paragraph | heading)*',
+  defining: true,
+  isolating: true,
+  draggable: true,
+  selectable: true,
 
-function extractImageNodes(slice) {
-  const images = [];
-  slice.content.descendants((node) => {
-    if (node.type.name === 'image' && node.attrs?.src) {
-      images.push(node);
-      return false;
-    }
-    return true;
-  });
-  return images;
-}
+  addAttributes() {
+    return {
+      textPos: {
+        default: 'below',
+        parseHTML: (el) =>
+          el.getAttribute('data-text-pos') ||
+          el.getAttribute('data-caption-pos') ||
+          (el.className.match(/blog-figure--(below|above|left|right)/) || [])[1] ||
+          'below',
+        renderHTML: (attrs) => ({
+          'data-text-pos': attrs.textPos || 'below',
+          'data-caption-pos': attrs.textPos || 'below',
+        }),
+      },
+      layout: {
+        default: 'top',
+        parseHTML: (el) =>
+          el.getAttribute('data-layout') ||
+          (el.className.match(/blog-img-(left|right|top|wrap|center)/) || [])[1] ||
+          'top',
+        renderHTML: (attrs) => ({ 'data-layout': attrs.layout || 'top' }),
+      },
+    };
+  },
 
-function placeBesideOnDrop(view, event, slice, moved) {
-  const images = extractImageNodes(slice);
-  if (!images.length) return false;
-
-  const coords = view.posAtCoords({ left: event.clientX, top: event.clientY });
-  if (!coords) return false;
-
-  const { state } = view;
-  let target = findImageNearPos(state.doc, coords.pos);
-  if (!target) return false;
-
-  // Prefer a concrete image under the pointer (not only row wrapper)
-  if (target.isRow) {
-    let offset = target.pos + 1;
-    let best = null;
-    target.node.forEach((child) => {
-      if (child.type.name === 'image') {
-        const dom = view.nodeDOM(offset);
-        if (dom?.getBoundingClientRect) {
-          const r = dom.getBoundingClientRect();
-          if (
-            event.clientX >= r.left - 12 &&
-            event.clientX <= r.right + 12 &&
-            event.clientY >= r.top - 12 &&
-            event.clientY <= r.bottom + 12
-          ) {
-            best = { pos: offset, node: child };
+  parseHTML() {
+    return [
+      { tag: 'div[data-image-text]' },
+      {
+        tag: 'figure.blog-figure',
+        getAttrs: (el) => {
+          if (!el.querySelector?.('img[src]')) return false;
+          return {};
+        },
+        contentElement: (el) => {
+          const wrap = document.createElement('div');
+          const img = el.querySelector('img');
+          if (img) wrap.appendChild(img.cloneNode(true));
+          el.querySelectorAll('p, h1, h2, h3, h4').forEach((n) => {
+            wrap.appendChild(n.cloneNode(true));
+          });
+          const fc = el.querySelector('figcaption');
+          if (fc && !wrap.querySelector('p, h1, h2, h3, h4')) {
+            const p = document.createElement('p');
+            p.innerHTML = fc.innerHTML || fc.textContent || '';
+            wrap.appendChild(p);
           }
-        }
-      }
-      offset += child.nodeSize;
-    });
-    if (best) target = best;
-  }
+          return wrap;
+        },
+      },
+    ];
+  },
 
-  const targetDom = view.nodeDOM(target.pos);
-  if (!targetDom || typeof targetDom.getBoundingClientRect !== 'function') return false;
+  renderHTML({ node, HTMLAttributes }) {
+    const textPos = node.attrs.textPos || 'below';
+    const layout = node.attrs.layout || 'top';
+    return [
+      'figure',
+      mergeAttributes(HTMLAttributes, {
+        'data-image-text': '',
+        'data-text-pos': textPos,
+        'data-caption-pos': textPos,
+        'data-layout': layout,
+        class: `blog-figure blog-figure--${textPos} blog-img blog-img-${layout}`,
+        style: LAYOUT_CSS[layout] || LAYOUT_CSS.top,
+      }),
+      0,
+    ];
+  },
 
-  const rect = targetDom.getBoundingClientRect();
-  const nearY = event.clientY >= rect.top - 28 && event.clientY <= rect.bottom + 28;
-  const nearX = event.clientX >= rect.left - 28 && event.clientX <= rect.right + 28;
-  if (!nearY || !nearX) return false;
+  addCommands() {
+    return {
+      addTextNearImage:
+        (textPos = 'below') =>
+        ({ state, dispatch, tr }) => {
+          const { selection, schema } = state;
+          const blockType = schema.nodes.imageTextBlock;
+          const imageType = schema.nodes.image;
+          const paraType = schema.nodes.paragraph;
+          if (!blockType || !imageType || !paraType) return false;
 
-  // Dropping on the same node → let ProseMirror do a normal move
-  if (moved && state.selection instanceof NodeSelection && state.selection.from === target.pos) {
-    return false;
-  }
+          // Already inside imageTextBlock → ensure a paragraph exists and focus it
+          for (let d = selection.$from.depth; d > 0; d -= 1) {
+            const n = selection.$from.node(d);
+            if (n.type.name === 'imageTextBlock') {
+              const blockPos = selection.$from.before(d);
+              let hasText = false;
+              n.forEach((child) => {
+                if (child.type.name === 'paragraph' || child.type.name === 'heading') hasText = true;
+              });
+              if (dispatch) {
+                let nextTr = tr;
+                if (!hasText) {
+                  const insertAt = blockPos + n.nodeSize - 1;
+                  nextTr = nextTr.insert(
+                    insertAt,
+                    paraType.create(null, schema.text('Type text here…'))
+                  );
+                }
+                if (textPos && textPos !== n.attrs.textPos) {
+                  nextTr = nextTr.setNodeMarkup(blockPos, undefined, {
+                    ...n.attrs,
+                    textPos,
+                  });
+                }
+                const textStart = blockPos + 1 + (n.firstChild?.nodeSize || 0);
+                nextTr = nextTr.setSelection(TextSelection.near(nextTr.doc.resolve(textStart)));
+                dispatch(nextTr.scrollIntoView());
+              }
+              return true;
+            }
+          }
 
-  const onLeft = event.clientX < rect.left + rect.width * 0.5;
-  event.preventDefault();
+          if (!(selection instanceof NodeSelection) || selection.node.type.name !== 'image') {
+            return false;
+          }
 
-  const imageType = state.schema.nodes.image;
-  const rowType = state.schema.nodes.imageRow;
-  if (!imageType || !rowType) return false;
+          const imageNode = selection.node;
+          const pos = selection.from;
+          const legacyCaption = (imageNode.attrs.caption || '').trim();
+          const cleanImage = imageType.create({
+            ...imageNode.attrs,
+            layout: 'top',
+            caption: '',
+            captionPos: 'below',
+          });
+          const para = paraType.create(
+            null,
+            schema.text(legacyCaption || 'Type text here…')
+          );
+          const block = blockType.create(
+            {
+              textPos: textPos || imageNode.attrs.captionPos || 'below',
+              layout: imageNode.attrs.layout || 'top',
+            },
+            [cleanImage, para]
+          );
+          if (dispatch) {
+            let nextTr = tr.replaceWith(pos, pos + imageNode.nodeSize, block);
+            const textStart = pos + 1 + cleanImage.nodeSize;
+            nextTr = nextTr.setSelection(TextSelection.near(nextTr.doc.resolve(textStart)));
+            dispatch(nextTr.scrollIntoView());
+          }
+          return true;
+        },
+      setImageTextPos:
+        (textPos) =>
+        ({ state, dispatch, tr }) => {
+          const { selection } = state;
+          for (let d = selection.$from.depth; d > 0; d -= 1) {
+            const n = selection.$from.node(d);
+            if (n.type.name === 'imageTextBlock') {
+              if (dispatch) {
+                dispatch(
+                  tr
+                    .setNodeMarkup(selection.$from.before(d), undefined, {
+                      ...n.attrs,
+                      textPos,
+                    })
+                    .scrollIntoView()
+                );
+              }
+              return true;
+            }
+          }
+          if (selection instanceof NodeSelection && selection.node.type.name === 'image') {
+            const $pos = state.doc.resolve(selection.from);
+            if ($pos.parent.type.name === 'imageTextBlock') {
+              if (dispatch) {
+                dispatch(
+                  tr
+                    .setNodeMarkup($pos.before($pos.depth), undefined, {
+                      ...$pos.parent.attrs,
+                      textPos,
+                    })
+                    .scrollIntoView()
+                );
+              }
+              return true;
+            }
+          }
+          return false;
+        },
+      removeTextNearImage:
+        () =>
+        ({ state, dispatch, tr }) => {
+          const { selection, schema } = state;
+          for (let d = selection.$from.depth; d > 0; d -= 1) {
+            const n = selection.$from.node(d);
+            if (n.type.name === 'imageTextBlock') {
+              const blockPos = selection.$from.before(d);
+              let imageChild = null;
+              n.forEach((child) => {
+                if (child.type.name === 'image' && !imageChild) imageChild = child;
+              });
+              if (!imageChild) return false;
+              const image = schema.nodes.image.create({
+                ...imageChild.attrs,
+                layout: n.attrs.layout || imageChild.attrs.layout || 'top',
+              });
+              if (dispatch) {
+                dispatch(tr.replaceWith(blockPos, blockPos + n.nodeSize, image).scrollIntoView());
+              }
+              return true;
+            }
+          }
+          return false;
+        },
+    };
+  },
+});
 
-  const dropped = images.map((img) =>
-    imageType.create({
-      ...img.attrs,
-      layout: 'top',
-      width: clampImageWidth(img.attrs.width || 320, 700),
-    })
-  );
+/** Flexible card: user adds image / title / text only if they want. */
+const BlogCard = Node.create({
+  name: 'blogCard',
+  content: '(image | heading | paragraph)*',
+  defining: true,
+  isolating: true,
 
-  let tr = state.tr;
-  if (moved && !state.selection.empty) {
-    tr = tr.deleteSelection();
-  }
+  parseHTML() {
+    return [{ tag: 'div[data-blog-card]' }];
+  },
 
-  let insertPos = tr.mapping.map(target.pos);
-  let targetNode = tr.doc.nodeAt(insertPos);
-  if (!targetNode || (targetNode.type.name !== 'image' && targetNode.type.name !== 'imageRow')) {
-    const found = findImageNearPos(tr.doc, insertPos);
-    if (!found) return false;
-    insertPos = found.pos;
-    targetNode = found.node;
-  }
+  renderHTML({ HTMLAttributes }) {
+    return [
+      'div',
+      mergeAttributes(HTMLAttributes, {
+        'data-blog-card': '',
+        class: 'blog-card',
+      }),
+      0,
+    ];
+  },
 
-  if (targetNode.type.name === 'imageRow') {
-    const kids = [];
-    targetNode.forEach((child) => {
-      if (child.type.name === 'image') kids.push(child);
-    });
-    const merged = onLeft ? [...dropped, ...kids] : [...kids, ...dropped];
-    const row = rowType.create(
-      null,
-      merged.slice(0, 4).map((n) =>
-        imageType.create({
-          ...n.attrs,
-          layout: 'top',
-          width: clampImageWidth(n.attrs.width || 320, 700),
+  addNodeView() {
+    return ({ editor, getPos, node }) => {
+      const outer = document.createElement('div');
+      outer.className = 'blog-card-editor';
+      outer.setAttribute('data-blog-card', '');
+
+      const bar = document.createElement('div');
+      bar.className = 'blog-card-editor-bar';
+      bar.contentEditable = 'false';
+
+      const makeBtn = (label, title, onClick) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = label;
+        btn.title = title;
+        btn.className = 'blog-card-editor-btn';
+        btn.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onClick();
+        });
+        return btn;
+      };
+
+      const runAtEnd = (fn) => {
+        if (typeof getPos !== 'function') return;
+        const pos = getPos();
+        if (typeof pos !== 'number') return;
+        const current = editor.state.doc.nodeAt(pos);
+        if (!current) return;
+        fn(pos, current);
+      };
+
+      bar.appendChild(
+        makeBtn('+ Image', 'Add image to this card', () => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = 'image/*';
+          input.onchange = async () => {
+            const file = input.files?.[0];
+            if (!file) return;
+            const uploader = editor.storage.blogEditorBridge?.onInlineImage;
+            let src = null;
+            if (typeof uploader === 'function') src = await uploader(file);
+            else src = URL.createObjectURL(file);
+            if (!src) return;
+            const width = await readNaturalWidth(src);
+            runAtEnd((pos, current) => {
+              editor
+                .chain()
+                .focus()
+                .insertContentAt(pos + current.nodeSize - 1, {
+                  type: 'image',
+                  attrs: {
+                    src,
+                    alt: file.name || 'image',
+                    layout: 'top',
+                    width: clampImageWidth(width, 480),
+                  },
+                })
+                .run();
+            });
+          };
+          input.click();
         })
-      )
-    );
-    tr = tr.replaceWith(insertPos, insertPos + targetNode.nodeSize, row);
-  } else if (targetNode.type.name === 'image') {
-    const targetImg = imageType.create({
-      ...targetNode.attrs,
-      layout: 'top',
-      width: clampImageWidth(targetNode.attrs.width || 320, 700),
-    });
-    const rowChildren = onLeft ? [...dropped, targetImg] : [targetImg, ...dropped];
-    tr = tr.replaceWith(
-      insertPos,
-      insertPos + targetNode.nodeSize,
-      rowType.create(null, rowChildren.slice(0, 4))
-    );
-  } else {
-    return false;
-  }
+      );
+      bar.appendChild(
+        makeBtn('+ Title', 'Add title to this card', () => {
+          runAtEnd((pos, current) => {
+            editor
+              .chain()
+              .focus()
+              .insertContentAt(pos + current.nodeSize - 1, {
+                type: 'heading',
+                attrs: { level: 4 },
+                content: [{ type: 'text', text: 'Card title' }],
+              })
+              .run();
+          });
+        })
+      );
+      bar.appendChild(
+        makeBtn('+ Text', 'Add text to this card', () => {
+          runAtEnd((pos, current) => {
+            const insertPos = pos + current.nodeSize - 1;
+            editor
+              .chain()
+              .focus()
+              .insertContentAt(insertPos, {
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Add your text…' }],
+              })
+              .setTextSelection(insertPos + 1)
+              .run();
+          });
+        })
+      );
+      bar.appendChild(
+        makeBtn('Remove', 'Remove this card', () => {
+          runAtEnd((pos, current) => {
+            const $pos = editor.state.doc.resolve(pos);
+            const parent = $pos.parent;
+            if (parent.type.name === 'cardRow' && parent.childCount <= 1) {
+              const rowPos = $pos.before($pos.depth);
+              editor
+                .chain()
+                .focus()
+                .deleteRange({ from: rowPos, to: rowPos + parent.nodeSize })
+                .run();
+              return;
+            }
+            editor
+              .chain()
+              .focus()
+              .deleteRange({ from: pos, to: pos + current.nodeSize })
+              .run();
+          });
+        })
+      );
 
-  view.dispatch(tr.scrollIntoView());
-  return true;
-}
+      const body = document.createElement('div');
+      body.className = 'blog-card-editor-body';
+      if (!node.content.size) {
+        body.dataset.empty = '1';
+      }
+
+      outer.appendChild(bar);
+      outer.appendChild(body);
+
+      return {
+        dom: outer,
+        contentDOM: body,
+        update: (updated) => {
+          if (updated.type.name !== 'blogCard') return false;
+          if (updated.content.size) delete body.dataset.empty;
+          else body.dataset.empty = '1';
+          return true;
+        },
+        ignoreMutation: (mutation) => {
+          if (mutation.type === 'selection') return false;
+          return !body.contains(mutation.target);
+        },
+        stopEvent: (event) => Boolean(event.target?.closest?.('.blog-card-editor-bar')),
+      };
+    };
+  },
+});
+
+/** Row of cards — same flexible side-by-side idea as images. */
+const CardRow = Node.create({
+  name: 'cardRow',
+  group: 'block',
+  content: 'blogCard+',
+  defining: true,
+  isolating: true,
+
+  addAttributes() {
+    return {
+      align: {
+        default: 'left',
+        parseHTML: (el) => el.getAttribute('data-align') || 'left',
+        renderHTML: (attrs) => ({ 'data-align': attrs.align || 'left' }),
+      },
+    };
+  },
+
+  parseHTML() {
+    return [{ tag: 'div[data-card-row]' }];
+  },
+
+  renderHTML({ HTMLAttributes, node }) {
+    const align = node?.attrs?.align || HTMLAttributes['data-align'] || 'left';
+    return [
+      'div',
+      mergeAttributes(HTMLAttributes, {
+        'data-card-row': '',
+        'data-align': align,
+        class: `blog-card-row blog-card-row--${align}`,
+        style: rowAlignStyle(align),
+      }),
+      0,
+    ];
+  },
+
+  addCommands() {
+    return {
+      insertCardRow:
+        (align = 'left') =>
+        ({ commands }) =>
+          commands.insertContent({
+            type: this.name,
+            attrs: { align },
+            content: [{ type: 'blogCard' }],
+          }),
+      addCardToRow:
+        () =>
+        ({ state, dispatch }) => {
+          const { $from } = state.selection;
+          let rowPos = null;
+          let rowNode = null;
+          for (let d = $from.depth; d > 0; d -= 1) {
+            const n = $from.node(d);
+            if (n.type.name === 'cardRow') {
+              rowPos = $from.before(d);
+              rowNode = n;
+              break;
+            }
+          }
+          if (rowPos == null || !rowNode) return false;
+          if (dispatch) {
+            const insertAt = rowPos + rowNode.nodeSize - 1;
+            const card = state.schema.nodes.blogCard.create();
+            dispatch(state.tr.insert(insertAt, card).scrollIntoView());
+          }
+          return true;
+        },
+    };
+  },
+});
 
 const CustomImage = TiptapImage.extend({
   draggable: true,
   selectable: true,
+  inline: false,
+  group: 'block',
 
   addAttributes() {
     return {
@@ -312,10 +724,12 @@ const CustomImage = TiptapImage.extend({
       width: {
         default: 360,
         parseHTML: (el) => {
+          const target = el.tagName === 'FIGURE' ? el.querySelector('img') || el : el;
           const w =
-            el.getAttribute('width') ||
+            target.getAttribute('width') ||
+            target.getAttribute('data-width') ||
             el.getAttribute('data-width') ||
-            (el.style?.width || '').replace(/px$/i, '');
+            (target.style?.width || '').replace(/px$/i, '');
           const n = parseInt(w, 10);
           return Number.isFinite(n) && n > 0 ? n : 360;
         },
@@ -329,27 +743,50 @@ const CustomImage = TiptapImage.extend({
       },
       layout: {
         default: 'top',
-        parseHTML: (el) => el.getAttribute('data-layout') || 'top',
+        parseHTML: (el) =>
+          el.getAttribute('data-layout') ||
+          (el.className.match(/blog-img-(left|right|top|wrap|center)/) || [])[1] ||
+          'top',
         renderHTML: (attrs) => ({
           'data-layout': attrs.layout || 'top',
         }),
       },
+      caption: {
+        default: '',
+        parseHTML: (el) => el.getAttribute('data-caption') || '',
+        renderHTML: () => ({}),
+      },
+      captionPos: {
+        default: 'below',
+        parseHTML: () => 'below',
+        renderHTML: () => ({}),
+      },
     };
   },
 
-  renderHTML({ HTMLAttributes }) {
-    const layout = HTMLAttributes['data-layout'] || 'top';
-    const width = HTMLAttributes.width || HTMLAttributes['data-width'] || 360;
+  parseHTML() {
+    return [{ tag: 'img[src]' }];
+  },
+
+  renderHTML({ node, HTMLAttributes }) {
+    const layout = node.attrs.layout || 'top';
+    const width = node.attrs.width || 360;
     const { style: _s, class: _c, ...rest } = HTMLAttributes;
     return [
       'img',
       {
         ...rest,
-        class: `blog-img blog-img-${layout}`,
+        src: node.attrs.src,
+        alt: node.attrs.alt || '',
+        class: 'blog-img blog-img-' + layout,
         'data-layout': layout,
         width: String(width),
         'data-width': String(width),
-        style: `${LAYOUT_CSS[layout] || LAYOUT_CSS.top}width:${width}px;max-width:100%;height:auto;border-radius:0.375rem;`,
+        style:
+          (LAYOUT_CSS[layout] || LAYOUT_CSS.top) +
+          'width:' +
+          width +
+          'px;max-width:100%;height:auto;border-radius:0.375rem;',
       },
     ];
   },
@@ -357,28 +794,10 @@ const CustomImage = TiptapImage.extend({
   addNodeView() {
     return ({ node, editor, getPos }) => {
       const outer = document.createElement('div');
-      outer.className = `blog-img-node blog-img-node--${node.attrs.layout || 'top'}`;
+      outer.className = 'blog-img-node blog-img-node--' + (node.attrs.layout || 'top');
       outer.contentEditable = 'false';
-      // Entire card is a TipTap drag handle so repositioning is easy
-      outer.setAttribute('data-drag-handle', '');
+      // ProseMirror moves draggable leaf nodes via HTML5 drag — keep this true
       outer.draggable = true;
-
-      const toolbar = document.createElement('div');
-      toolbar.className = 'blog-img-toolbar';
-
-      const dragBtn = document.createElement('span');
-      dragBtn.className = 'blog-img-drag';
-      dragBtn.setAttribute('data-drag-handle', '');
-      dragBtn.draggable = true;
-      dragBtn.contentEditable = 'false';
-      dragBtn.title = 'Drag to move — drop on another image (left/right) to place side by side';
-      dragBtn.textContent = '⠿ Move';
-
-      const sizeLabel = document.createElement('span');
-      sizeLabel.className = 'blog-img-size-label';
-
-      toolbar.appendChild(dragBtn);
-      toolbar.appendChild(sizeLabel);
 
       const frame = document.createElement('div');
       frame.className = 'blog-img-frame';
@@ -390,32 +809,41 @@ const CustomImage = TiptapImage.extend({
 
       const handles = ['nw', 'ne', 'sw', 'se', 'e', 'w'].map((dir) => {
         const h = document.createElement('span');
-        h.className = `blog-img-handle blog-img-handle--${dir}`;
+        h.className = 'blog-img-handle blog-img-handle--' + dir;
         h.dataset.dir = dir;
-        h.title = 'Drag to resize';
+        h.title = 'Drag corner to resize';
         h.draggable = false;
         frame.appendChild(h);
         return h;
       });
 
       frame.appendChild(img);
-      outer.appendChild(toolbar);
       outer.appendChild(frame);
 
       const applyChrome = (attrs) => {
         const layout = attrs.layout || 'top';
         const width = clampImageWidth(attrs.width || 360);
-        const inRow = Boolean(outer.closest?.('.blog-image-row, [data-image-row]'));
-        outer.className = `blog-img-node blog-img-node--${layout}${inRow ? ' in-row' : ''}`;
-        // Editor always uses block flow so drag/drop positioning works reliably.
-        // Float styles are still written to HTML via renderHTML for the live site.
-        outer.style.cssText = inRow
-          ? `float:none;display:block;margin:0;width:${width}px;max-width:100%;`
-          : `display:block;float:none;clear:both;margin:0.85rem 0;width:${width}px;max-width:100%;`;
+        const inRow = Boolean(
+          outer.closest?.(
+            '.blog-image-row, [data-image-row], figure.blog-figure, [data-image-text], .blog-card-editor, .blog-card, [data-blog-card]'
+          )
+        );
+        outer.className =
+          'blog-img-node blog-img-node--' + layout + (inRow ? ' in-row' : '');
+        if (inRow) {
+          outer.style.cssText =
+            'float:none;display:block;margin:0;clear:none;width:' +
+            width +
+            'px;max-width:100%;box-sizing:border-box;';
+        } else {
+          const layoutStyle = LAYOUT_CSS[layout] || LAYOUT_CSS.top;
+          outer.style.cssText =
+            layoutStyle + 'width:' + width + 'px;max-width:100%;box-sizing:border-box;';
+        }
         outer.dataset.width = String(width);
         outer.dataset.layout = layout;
-        sizeLabel.textContent = `${width}px · drag to move`;
-        img.style.cssText = 'display:block;width:100%;height:auto;border-radius:0.375rem;pointer-events:none;';
+        img.style.cssText =
+          'display:block;width:100%;height:auto;border-radius:0.375rem;pointer-events:none;';
       };
       applyChrome(node.attrs);
 
@@ -472,46 +900,43 @@ const CustomImage = TiptapImage.extend({
         });
       });
 
-      outer.addEventListener('click', (e) => {
-        if (e.target.closest('.blog-img-handle')) return;
+      // Select on pointer down so ProseMirror dragstart sees a NodeSelection
+      outer.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        if (e.target.closest?.('.blog-img-handle')) return;
         if (typeof getPos === 'function') {
           const pos = getPos();
-          if (typeof pos === 'number') editor.commands.setNodeSelection(pos);
+          if (typeof pos === 'number') {
+            editor.commands.setNodeSelection(pos);
+          }
         }
-      });
-
-      outer.addEventListener('dragstart', (e) => {
-        if (resizing || e.target.closest?.('.blog-img-handle')) {
-          e.preventDefault();
-          return;
-        }
-        if (typeof getPos === 'function') {
-          const pos = getPos();
-          if (typeof pos === 'number') editor.commands.setNodeSelection(pos);
-        }
-        outer.classList.add('is-dragging');
-      });
-
-      outer.addEventListener('dragend', () => {
-        outer.classList.remove('is-dragging');
-        // Refresh in-row class after possible row merge
-        applyChrome({
-          layout: outer.dataset.layout || 'top',
-          width: outer.dataset.width || 360,
-        });
       });
 
       return {
         dom: outer,
-        // Let ProseMirror/TipTap handle drag & drop; we only steal resize events
+        // Never block drag/drop — only steal resize-handle mouse events
         stopEvent: (event) => {
-          if (event.target?.closest?.('.blog-img-handle')) return true;
           if (resizing) return true;
+          if (
+            event.target?.closest?.('.blog-img-handle') &&
+            (event.type === 'mousedown' ||
+              event.type === 'mousemove' ||
+              event.type === 'mouseup' ||
+              event.type === 'pointerdown')
+          ) {
+            return true;
+          }
           return false;
         },
         ignoreMutation: () => true,
-        selectNode: () => outer.classList.add('is-selected'),
-        deselectNode: () => outer.classList.remove('is-selected'),
+        selectNode: () => {
+          outer.classList.add('is-selected');
+          outer.draggable = true;
+        },
+        deselectNode: () => {
+          outer.classList.remove('is-selected');
+          outer.draggable = true;
+        },
         update: (updated) => {
           if (updated.type.name !== 'image') return false;
           img.src = updated.attrs.src || '';
@@ -546,7 +971,6 @@ const StyledTableCell = TableCell.extend({
     };
   },
 });
-
 
 function ToolbarBtn({ onClick, active, disabled, title, children }) {
   return (
@@ -602,31 +1026,152 @@ function MenuItem({ onClick, active, children, danger }) {
   );
 }
 
+function MenuLabel({ children }) {
+  return <p className="px-3 pt-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-gray-400">{children}</p>;
+}
+
+function getImageSelectionContext(editor) {
+  if (!editor) return null;
+  const { state } = editor;
+  const { selection } = state;
+  if (selection instanceof NodeSelection) {
+    const node = selection.node;
+    if (node.type.name === 'image') {
+      const $pos = state.doc.resolve(selection.from);
+      const parent = $pos.parent;
+      if (parent.type.name === 'imageRow') {
+        return {
+          kind: 'imageInRow',
+          imagePos: selection.from,
+          imageNode: node,
+          rowPos: $pos.before($pos.depth),
+          rowNode: parent,
+        };
+      }
+      if (parent.type.name === 'imageTextBlock') {
+        return {
+          kind: 'imageText',
+          imagePos: selection.from,
+          imageNode: node,
+          blockPos: $pos.before($pos.depth),
+          blockNode: parent,
+        };
+      }
+      return { kind: 'image', imagePos: selection.from, imageNode: node };
+    }
+    if (node.type.name === 'imageTextBlock') {
+      return {
+        kind: 'imageText',
+        blockPos: selection.from,
+        blockNode: node,
+      };
+    }
+    if (node.type.name === 'imageRow') {
+      return { kind: 'row', rowPos: selection.from, rowNode: node };
+    }
+    if (node.type.name === 'cardRow') {
+      return { kind: 'cardRow', rowPos: selection.from, rowNode: node };
+    }
+    if (node.type.name === 'blogCard') {
+      return { kind: 'blogCard', cardPos: selection.from, cardNode: node };
+    }
+  }
+
+  const { $from } = selection;
+  for (let d = $from.depth; d > 0; d -= 1) {
+    const n = $from.node(d);
+    if (n.type.name === 'imageTextBlock') {
+      return {
+        kind: 'imageText',
+        blockPos: $from.before(d),
+        blockNode: n,
+      };
+    }
+    if (n.type.name === 'imageRow') {
+      return { kind: 'row', rowPos: $from.before(d), rowNode: n };
+    }
+    if (n.type.name === 'blogCard') {
+      const cardCtx = {
+        kind: 'blogCard',
+        cardPos: $from.before(d),
+        cardNode: n,
+      };
+      const rowDepth = d - 1;
+      if (rowDepth > 0 && $from.node(rowDepth).type.name === 'cardRow') {
+        return {
+          ...cardCtx,
+          rowPos: $from.before(rowDepth),
+          rowNode: $from.node(rowDepth),
+        };
+      }
+      return cardCtx;
+    }
+    if (n.type.name === 'cardRow') {
+      return { kind: 'cardRow', rowPos: $from.before(d), rowNode: n };
+    }
+  }
+  return null;
+}
+
+function findNeighborImage(doc, imagePos, direction) {
+  const $pos = doc.resolve(imagePos);
+  if (direction === 'prev') {
+    const before = $pos.nodeBefore;
+    if (before?.type.name === 'image') {
+      return { pos: imagePos - before.nodeSize, node: before };
+    }
+  } else {
+    const afterPos = imagePos + ($pos.nodeAfter?.nodeSize || doc.nodeAt(imagePos)?.nodeSize || 0);
+    const after = doc.nodeAt(afterPos);
+    // when selection is on image, nodeAfter at imagePos is the image itself in some cases
+    const imageNode = doc.nodeAt(imagePos);
+    if (!imageNode) return null;
+    const nextPos = imagePos + imageNode.nodeSize;
+    const next = doc.nodeAt(nextPos);
+    if (next?.type.name === 'image') return { pos: nextPos, node: next };
+    if (after?.type.name === 'image' && afterPos !== imagePos) {
+      return { pos: afterPos, node: after };
+    }
+  }
+  return null;
+}
+
 export default function BlogDescriptionEditor({ value = '', onChange, onInlineImage, error }) {
   const [menu, setMenu] = useState(null);
   const [showSource, setShowSource] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [sourceHtml, setSourceHtml] = useState(value || '');
+  const [sourceHtml, setSourceHtml] = useState(() => sanitizeBlogEditorHtml(value || ''));
   const [customSize, setCustomSize] = useState('');
   const [customImageWidth, setCustomImageWidth] = useState('');
   const [cellColor, setCellColor] = useState('#fef08a');
   const [, setSelTick] = useState(0);
   const fileInputRef = useRef(null);
+  const sideBySideInputRef = useRef(null);
+  const addBesideInputRef = useRef(null);
   const syncingFromProp = useRef(false);
+  const onInlineImageRef = useRef(onInlineImage);
+
+  useEffect(() => {
+    onInlineImageRef.current = onInlineImage;
+  }, [onInlineImage]);
 
   const closeMenu = useCallback(() => setMenu(null), []);
 
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
+      BlogEditorBridge,
       StarterKit.configure({
-        link: {
-          openOnClick: false,
-          HTMLAttributes: { rel: 'noopener noreferrer nofollow', target: '_blank' },
-        },
+        link: false,
         bulletList: false,
         orderedList: false,
+      }),
+      BlogLink.configure({
+        openOnClick: false,
+        autolink: true,
+        linkOnPaste: true,
+        HTMLAttributes: { target: '_blank' },
       }),
       StyledBulletList,
       StyledOrderedList,
@@ -634,7 +1179,11 @@ export default function BlogDescriptionEditor({ value = '', onChange, onInlineIm
       Color,
       FontSize,
       Highlight.configure({ multicolor: true }),
+      Underline,
       ImageRow,
+      ImageTextBlock,
+      CardRow,
+      BlogCard,
       CustomImage.configure({ allowBase64: false }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Table.configure({
@@ -648,18 +1197,25 @@ export default function BlogDescriptionEditor({ value = '', onChange, onInlineIm
       StyledTableCell,
       Placeholder.configure({ placeholder: 'Start typing...' }),
     ],
-    content: value || '',
+    content: sanitizeBlogEditorHtml(value || ''),
+    onCreate: ({ editor: ed }) => {
+      ed.storage.blogEditorBridge.onInlineImage = (...args) => onInlineImageRef.current?.(...args);
+    },
     onUpdate: ({ editor: ed }) => {
       if (syncingFromProp.current) return;
-      const html = ed.getHTML();
+      const html = sanitizeBlogEditorHtml(ed.getHTML());
       onChange?.(html);
       if (!showSource) setSourceHtml(html);
     },
     editorProps: {
       attributes: { class: 'blog-desc-prosemirror focus:outline-none text-gray-900' },
-      handleDrop: (view, event, slice, moved) => placeBesideOnDrop(view, event, slice, moved),
     },
   });
+
+  useEffect(() => {
+    if (!editor) return;
+    editor.storage.blogEditorBridge.onInlineImage = (...args) => onInlineImageRef.current?.(...args);
+  }, [editor]);
 
   useEffect(() => {
     if (!editor) return undefined;
@@ -674,10 +1230,11 @@ export default function BlogDescriptionEditor({ value = '', onChange, onInlineIm
 
   useEffect(() => {
     if (!editor) return;
-    if ((value || '') === editor.getHTML()) return;
+    const clean = sanitizeBlogEditorHtml(value || '');
+    if (clean === editor.getHTML()) return;
     syncingFromProp.current = true;
-    editor.commands.setContent(value || '', { emitUpdate: false });
-    setSourceHtml(value || '');
+    editor.commands.setContent(clean, { emitUpdate: false });
+    setSourceHtml(clean);
     syncingFromProp.current = false;
   }, [value, editor]);
 
@@ -697,17 +1254,64 @@ export default function BlogDescriptionEditor({ value = '', onChange, onInlineIm
 
   const toggleMenu = (id) => setMenu((m) => (m === id ? null : id));
 
+  const uploadFiles = async (files) => {
+    const list = Array.from(files || []).filter((f) => String(f.type || '').startsWith('image/'));
+    if (!list.length) {
+      window.alert('Please choose image files');
+      return [];
+    }
+    const out = [];
+    for (const file of list) {
+      let src = null;
+      if (typeof onInlineImageRef.current === 'function') {
+        src = await onInlineImageRef.current(file);
+      } else {
+        src = URL.createObjectURL(file);
+      }
+      if (!src) continue;
+      const width = await readNaturalWidth(src);
+      out.push({
+        src,
+        alt: file.name || 'image',
+        width,
+        layout: 'top',
+      });
+    }
+    return out;
+  };
+
   const setLink = () => {
     if (!editor) return;
-    const prev = editor.getAttributes('link').href || '';
+    const prevAttrs = editor.getAttributes('link');
+    const prev = prevAttrs.href || '';
     const url = window.prompt('Enter URL', prev || 'https://');
     if (url === null) return;
     if (!url.trim()) {
       editor.chain().focus().extendMarkRange('link').unsetLink().run();
       return;
     }
-    editor.chain().focus().extendMarkRange('link').setLink({ href: url.trim() }).run();
+    editor
+      .chain()
+      .focus()
+      .extendMarkRange('link')
+      .setLink({
+        href: url.trim(),
+        rel: prevAttrs.rel || LINK_REL_NOFOLLOW,
+      })
+      .run();
     closeMenu();
+  };
+
+  const applyLinkFollow = (followType) => {
+    if (!editor?.isActive('link')) return;
+    const { href } = editor.getAttributes('link');
+    if (!href) return;
+    editor
+      .chain()
+      .focus()
+      .extendMarkRange('link')
+      .setLink({ href, rel: relFromLinkFollow(followType) })
+      .run();
   };
 
   const applyBulletStyle = (style) => {
@@ -732,12 +1336,96 @@ export default function BlogDescriptionEditor({ value = '', onChange, onInlineIm
 
   const setImageLayout = (layout) => {
     if (!editor) return;
+    const ctx = getImageSelectionContext(editor);
+
+    // Image+text block: move/align the whole figure
+    if (ctx?.kind === 'imageText' && ctx.blockPos != null && ctx.blockNode) {
+      editor
+        .chain()
+        .focus()
+        .command(({ tr }) => {
+          tr.setNodeMarkup(ctx.blockPos, undefined, {
+            ...ctx.blockNode.attrs,
+            layout,
+          });
+          if (ctx.imagePos != null && ctx.imageNode) {
+            tr.setNodeMarkup(ctx.imagePos, undefined, {
+              ...ctx.imageNode.attrs,
+              layout: 'top',
+            });
+          }
+          return true;
+        })
+        .run();
+      closeMenu();
+      return;
+    }
+
     if (editor.isActive('image')) {
       editor.chain().focus().updateAttributes('image', { layout }).run();
     } else {
       window.alert('Select an image first, or upload an image then choose layout.');
     }
     closeMenu();
+  };
+
+  /** Move selected image / image-text / image-row up or down in the document. */
+  const moveSelectedBlock = (direction) => {
+    if (!editor) return;
+    const { state } = editor;
+    const ctx = getImageSelectionContext(editor);
+
+    let from = null;
+    let node = null;
+
+    if (ctx?.kind === 'imageText' && ctx.blockPos != null && ctx.blockNode) {
+      from = ctx.blockPos;
+      node = ctx.blockNode;
+    } else if ((ctx?.kind === 'imageInRow' || ctx?.kind === 'row') && ctx.rowPos != null && ctx.rowNode) {
+      from = ctx.rowPos;
+      node = ctx.rowNode;
+    } else if (ctx?.kind === 'image' && ctx.imagePos != null && ctx.imageNode) {
+      from = ctx.imagePos;
+      node = ctx.imageNode;
+    } else if (state.selection instanceof NodeSelection) {
+      from = state.selection.from;
+      node = state.selection.node;
+    }
+
+    if (from == null || !node) {
+      window.alert('Select an image first, then Move up / Move down.');
+      return;
+    }
+
+    const to = from + node.nodeSize;
+    const $from = state.doc.resolve(from);
+
+    if (direction === 'up') {
+      const before = $from.nodeBefore;
+      if (!before) {
+        window.alert('Already at the top.');
+        return;
+      }
+      const beforeStart = from - before.nodeSize;
+      const tr = state.tr.replaceWith(beforeStart, to, [node, before]);
+      tr.setSelection(NodeSelection.create(tr.doc, beforeStart));
+      editor.view.dispatch(tr.scrollIntoView());
+      closeMenu();
+      return;
+    }
+
+    if (direction === 'down') {
+      const after = state.doc.nodeAt(to);
+      if (!after) {
+        window.alert('Already at the bottom.');
+        return;
+      }
+      const afterEnd = to + after.nodeSize;
+      const tr = state.tr.replaceWith(from, afterEnd, [after, node]);
+      tr.setSelection(NodeSelection.create(tr.doc, from + after.nodeSize));
+      editor.view.dispatch(tr.scrollIntoView());
+      closeMenu();
+    }
   };
 
   const setImageWidth = (width) => {
@@ -752,26 +1440,222 @@ export default function BlogDescriptionEditor({ value = '', onChange, onInlineIm
     closeMenu();
   };
 
-  const onPickImage = async (file) => {
-    if (!file || !editor) return;
-    if (!String(file.type || '').startsWith('image/')) {
-      window.alert('Please choose an image file');
+  const addTextNearImage = (textPos = 'below') => {
+    if (!editor) return;
+    const ok = editor.chain().focus().addTextNearImage(textPos).run();
+    if (!ok) {
+      window.alert('Select an image first, then add text near it. After that, select the text and use the toolbar (size, bold, color…).');
+    }
+    closeMenu();
+  };
+
+  const setCaptionPos = (textPos) => {
+    if (!editor) return;
+    if (editor.isActive('imageTextBlock') || getImageSelectionContext(editor)?.kind === 'imageText') {
+      editor.chain().focus().setImageTextPos(textPos).run();
+      closeMenu();
       return;
     }
-    let src = null;
-    if (typeof onInlineImage === 'function') {
-      src = await onInlineImage(file);
-    } else {
-      src = URL.createObjectURL(file);
+    addTextNearImage(textPos);
+  };
+
+  const removeTextNearImage = () => {
+    if (!editor) return;
+    if (!editor.chain().focus().removeTextNearImage().run()) {
+      window.alert('No image text to remove. Select an image that already has text.');
     }
-    if (!src) return;
+    closeMenu();
+  };
+
+  const setRowAlign = (align) => {
+    if (!editor) return;
+    const ctx = getImageSelectionContext(editor);
+    if (ctx?.kind === 'imageInRow' || ctx?.kind === 'row') {
+      editor
+        .chain()
+        .focus()
+        .command(({ tr }) => {
+          tr.setNodeMarkup(ctx.rowPos, undefined, {
+            ...ctx.rowNode.attrs,
+            align,
+          });
+          return true;
+        })
+        .run();
+      closeMenu();
+      return;
+    }
+    if (ctx?.kind === 'cardRow' || (ctx?.kind === 'blogCard' && ctx.rowPos != null)) {
+      editor
+        .chain()
+        .focus()
+        .command(({ tr }) => {
+          tr.setNodeMarkup(ctx.rowPos, undefined, {
+            ...ctx.rowNode.attrs,
+            align,
+          });
+          return true;
+        })
+        .run();
+      closeMenu();
+      return;
+    }
+    if (editor.isActive('image')) {
+      editor.chain().focus().updateAttributes('image', { layout: align === 'center' ? 'center' : align === 'right' ? 'right' : 'top' }).run();
+      closeMenu();
+      return;
+    }
+    window.alert('Select an image row or cards row first.');
+    closeMenu();
+  };
+
+  /** One-click: join selected image with previous/next into a side-by-side row. */
+  const joinWithNeighbor = (direction) => {
+    if (!editor) return;
+    const ctx = getImageSelectionContext(editor);
+    if (!ctx || ctx.kind !== 'image') {
+      window.alert('Select a single image (not already side by side), then use Side by side.');
+      return;
+    }
+    const neighbor = findNeighborImage(editor.state.doc, ctx.imagePos, direction);
+    if (!neighbor) {
+      window.alert(
+        direction === 'prev'
+          ? 'No image just above/before this one. Upload another image next to it, or use “Add image beside”.'
+          : 'No image just below/after this one. Upload another image next to it, or use “Add image beside”.'
+      );
+      return;
+    }
+
+    const { state } = editor;
+    const imageType = state.schema.nodes.image;
+    const rowType = state.schema.nodes.imageRow;
+    const a = imageType.create({ ...ctx.imageNode.attrs, layout: 'top' });
+    const b = imageType.create({ ...neighbor.node.attrs, layout: 'top' });
+    const kids = direction === 'prev' ? [b, a] : [a, b];
+    const from = Math.min(ctx.imagePos, neighbor.pos);
+    const to =
+      Math.max(ctx.imagePos + ctx.imageNode.nodeSize, neighbor.pos + neighbor.node.nodeSize);
+    const row = rowType.create({ align: 'left' }, kids);
+    editor.view.dispatch(state.tr.replaceWith(from, to, row).scrollIntoView());
+    closeMenu();
+  };
+
+  /** Stack a side-by-side row back to one-under-another. */
+  const stackSeparately = () => {
+    if (!editor) return;
+    const ctx = getImageSelectionContext(editor);
+    if (!ctx || (ctx.kind !== 'imageInRow' && ctx.kind !== 'row')) {
+      window.alert('Select images that are already side by side.');
+      return;
+    }
+    const { state } = editor;
+    const kids = [];
+    ctx.rowNode.forEach((child) => {
+      if (child.type.name === 'image' || child.type.name === 'imageTextBlock') {
+        kids.push(child);
+      }
+    });
+    if (!kids.length) return;
+    const nodes = kids.map((child) => {
+      if (child.type.name === 'image') {
+        return state.schema.nodes.image.create({ ...child.attrs, layout: 'top' });
+      }
+      return child;
+    });
+    editor.view.dispatch(
+      state.tr.replaceWith(ctx.rowPos, ctx.rowPos + ctx.rowNode.nodeSize, nodes).scrollIntoView()
+    );
+    closeMenu();
+  };
+
+  const addImagesBeside = async (files) => {
+    if (!editor) return;
+    const uploaded = await uploadFiles(files);
+    if (!uploaded.length) return;
+    const ctx = getImageSelectionContext(editor);
+    const { state } = editor;
+    const imageType = state.schema.nodes.image;
+    const rowType = state.schema.nodes.imageRow;
+    const newNodes = uploaded.map((attrs) =>
+      imageType.create({
+        ...attrs,
+        layout: 'top',
+        width: clampImageWidth(attrs.width || 320, 700),
+      })
+    );
+
+    if (ctx?.kind === 'imageInRow' || ctx?.kind === 'row') {
+      const kids = [];
+      ctx.rowNode.forEach((child) => {
+        if (child.type.name === 'image' || child.type.name === 'imageTextBlock') kids.push(child);
+      });
+      const row = rowType.create(
+        { align: ctx.rowNode.attrs.align || 'left' },
+        [...kids, ...newNodes]
+      );
+      editor.view.dispatch(
+        state.tr.replaceWith(ctx.rowPos, ctx.rowPos + ctx.rowNode.nodeSize, row).scrollIntoView()
+      );
+      closeMenu();
+      return;
+    }
+
+    if (ctx?.kind === 'image') {
+      const current = imageType.create({ ...ctx.imageNode.attrs, layout: 'top' });
+      const row = rowType.create({ align: 'left' }, [current, ...newNodes]);
+      editor.view.dispatch(
+        state.tr
+          .replaceWith(ctx.imagePos, ctx.imagePos + ctx.imageNode.nodeSize, row)
+          .scrollIntoView()
+      );
+      closeMenu();
+      return;
+    }
+
+    editor.commands.setImageRow(uploaded, 'left');
+    closeMenu();
+  };
+
+  const insertSideBySideFromFiles = async (files) => {
+    if (!editor) return;
+    const uploaded = await uploadFiles(files);
+    if (!uploaded.length) return;
+    if (uploaded.length === 1) {
+      editor
+        .chain()
+        .focus()
+        .insertContent([
+          {
+            type: 'image',
+            attrs: {
+              ...uploaded[0],
+              width: clampImageWidth(uploaded[0].width || 360),
+            },
+          },
+          { type: 'paragraph' },
+        ])
+        .run();
+    } else {
+      editor.commands.setImageRow(uploaded, 'left');
+    }
+    closeMenu();
+  };
+
+  const onPickImage = async (file) => {
+    if (!file || !editor) return;
+    const uploaded = await uploadFiles([file]);
+    if (!uploaded[0]) return;
     editor
       .chain()
       .focus()
       .insertContent([
         {
           type: 'image',
-          attrs: { src, alt: file.name || 'image', layout: 'top', width: 360 },
+          attrs: {
+            ...uploaded[0],
+            width: clampImageWidth(uploaded[0].width || 360),
+          },
         },
         { type: 'paragraph' },
       ])
@@ -787,8 +1671,10 @@ export default function BlogDescriptionEditor({ value = '', onChange, onInlineIm
 
   const applySource = () => {
     if (!editor) return;
-    editor.commands.setContent(sourceHtml || '', { emitUpdate: true });
-    onChange?.(sourceHtml || '');
+    const clean = sanitizeBlogEditorHtml(sourceHtml || '');
+    setSourceHtml(clean);
+    editor.commands.setContent(clean, { emitUpdate: true });
+    onChange?.(clean);
     setShowSource(false);
   };
 
@@ -806,6 +1692,17 @@ export default function BlogDescriptionEditor({ value = '', onChange, onInlineIm
     );
   }
 
+  const imgCtx = getImageSelectionContext(editor);
+  const imageSelected = editor.isActive('image') || imgCtx?.kind === 'imageText';
+  const inImageRow = imgCtx?.kind === 'imageInRow' || imgCtx?.kind === 'row';
+  const inCardRow = imgCtx?.kind === 'cardRow' || Boolean(imgCtx?.rowNode);
+  const inImageText = imgCtx?.kind === 'imageText';
+  const currentCaptionPos =
+    (inImageText && imgCtx.blockNode?.attrs?.textPos) ||
+    editor.getAttributes('imageTextBlock')?.textPos ||
+    'below';
+  const currentRowAlign = imgCtx?.rowNode?.attrs?.align || null;
+
   const inTable = editor.isActive('table');
   const fontSizeRaw = editor.getAttributes('textStyle')?.fontSize || '';
   const currentFontSize = String(fontSizeRaw).replace(/px$/i, '').trim() || '—';
@@ -818,6 +1715,8 @@ export default function BlogDescriptionEditor({ value = '', onChange, onInlineIm
         : editor.isActive('heading', { level: 4 })
           ? 'H4'
           : 'P';
+  const linkActive = editor.isActive('link');
+  const linkFollow = linkActive ? linkFollowFromRel(editor.getAttributes('link').rel) : 'nofollow';
   const shellClass = isFullscreen
     ? 'fixed inset-0 z-[80] flex flex-col bg-white shadow-2xl'
     : `overflow-visible rounded-lg border bg-white ${error ? 'border-red-400' : 'border-gray-300'}`;
@@ -850,12 +1749,46 @@ export default function BlogDescriptionEditor({ value = '', onChange, onInlineIm
         .blog-desc-prosemirror .blog-img-node:active { cursor: grabbing; }
         .blog-desc-prosemirror .blog-img-node.in-row {
           float: none !important;
-          display: block;
+          display: block !important;
           margin: 0 !important;
           clear: none !important;
+          cursor: grab;
+        }
+        .blog-desc-prosemirror .blog-img-node--left,
+        .blog-desc-prosemirror .blog-img-node--wrap {
+          float: left;
+          margin: 0 1rem 0.85rem 0;
+          clear: none;
+        }
+        .blog-desc-prosemirror .blog-img-node--right {
+          float: right;
+          margin: 0 0 0.85rem 1rem;
+          clear: none;
+        }
+        .blog-desc-prosemirror .blog-img-node--top {
+          display: block;
+          float: none;
+          margin: 0.85rem 0;
+          clear: both;
+        }
+        .blog-desc-prosemirror .blog-img-node--center {
+          display: block;
+          float: none;
+          margin: 0.85rem auto;
+          clear: both;
         }
         .blog-desc-prosemirror .blog-image-row,
         .blog-desc-prosemirror div[data-image-row] {
+          display: flex;
+          flex-wrap: nowrap;
+          gap: 12px;
+          align-items: flex-start;
+          margin: 0.85rem 0;
+          clear: both;
+          width: 100%;
+        }
+        .blog-desc-prosemirror .blog-card-row,
+        .blog-desc-prosemirror div[data-card-row] {
           display: flex;
           flex-wrap: wrap;
           gap: 12px;
@@ -864,47 +1797,46 @@ export default function BlogDescriptionEditor({ value = '', onChange, onInlineIm
           clear: both;
           width: 100%;
         }
+        .blog-desc-prosemirror .blog-image-row--center,
+        .blog-desc-prosemirror .blog-card-row--center { justify-content: center; }
+        .blog-desc-prosemirror .blog-image-row--right,
+        .blog-desc-prosemirror .blog-card-row--right { justify-content: flex-end; }
+        .blog-desc-prosemirror .blog-image-row--left,
+        .blog-desc-prosemirror .blog-card-row--left { justify-content: flex-start; }
         .blog-desc-prosemirror .blog-image-row .blog-img-node {
           float: none !important;
+          flex: 0 1 auto;
+          min-width: 0;
+        }
+        .blog-desc-prosemirror .blog-image-row img,
+        .blog-desc-prosemirror div[data-image-row] img {
+          clear: none !important;
+          margin: 0 !important;
+          float: none !important;
+          flex-shrink: 1;
+          min-width: 0;
+        }
+        .blog-desc-prosemirror .blog-img-media {
+          display: flex;
+          gap: 8px;
+          width: 100%;
+        }
+        .blog-desc-prosemirror .blog-img-media--below { flex-direction: column; }
+        .blog-desc-prosemirror .blog-img-media--above { flex-direction: column-reverse; }
+        .blog-desc-prosemirror .blog-img-media--left { flex-direction: row-reverse; align-items: center; }
+        .blog-desc-prosemirror .blog-img-media--right { flex-direction: row; align-items: center; }
+        .blog-desc-prosemirror .blog-img-caption {
+          font-size: 12px;
+          line-height: 1.4;
+          color: #4b5563;
+          white-space: pre-wrap;
+          padding: 2px 0;
         }
         .blog-desc-prosemirror .ProseMirror-selectednode.blog-img-node,
         .blog-desc-prosemirror .blog-img-node.is-selected {
           outline: 2px solid #3b82f6;
           outline-offset: 2px;
           border-radius: 0.45rem;
-        }
-        .blog-desc-prosemirror .blog-img-toolbar {
-          display: none;
-          align-items: center;
-          gap: 6px;
-          position: absolute;
-          left: 6px;
-          top: 6px;
-          z-index: 8;
-          padding: 2px 6px;
-          border-radius: 6px;
-          background: rgba(15, 23, 42, 0.78);
-          color: #fff;
-          font-size: 11px;
-          line-height: 1;
-          pointer-events: none;
-        }
-        .blog-desc-prosemirror .blog-img-node.is-selected .blog-img-toolbar,
-        .blog-desc-prosemirror .blog-img-node:hover .blog-img-toolbar {
-          display: inline-flex;
-        }
-        .blog-desc-prosemirror .blog-img-drag {
-          cursor: grab;
-          user-select: none;
-          font-size: 12px;
-          padding: 2px 4px;
-          border-radius: 4px;
-          letter-spacing: 0.02em;
-        }
-        .blog-desc-prosemirror .blog-img-drag:active { cursor: grabbing; }
-        .blog-desc-prosemirror .blog-img-size-label {
-          opacity: 0.9;
-          font-family: ui-sans-serif, system-ui, sans-serif;
         }
         .blog-desc-prosemirror .blog-img-frame {
           position: relative;
@@ -932,14 +1864,76 @@ export default function BlogDescriptionEditor({ value = '', onChange, onInlineIm
         .blog-desc-prosemirror .blog-img-handle--se { right: -5px; bottom: -5px; cursor: nwse-resize; }
         .blog-desc-prosemirror .blog-img-handle--e { right: -5px; top: 50%; margin-top: -5px; cursor: ew-resize; }
         .blog-desc-prosemirror .blog-img-handle--w { left: -5px; top: 50%; margin-top: -5px; cursor: ew-resize; }
-        .blog-desc-preview .blog-image-row,
-        .blog-desc-preview div[data-image-row] {
+        .blog-desc-prosemirror figure.blog-figure,
+        .blog-desc-prosemirror [data-image-text] {
           display: flex;
-          flex-wrap: wrap;
-          gap: 12px;
+          gap: 10px;
           align-items: flex-start;
+          max-width: 100%;
           margin: 0.85rem 0;
           clear: both;
+        }
+        .blog-desc-prosemirror figure.blog-figure--below,
+        .blog-desc-prosemirror [data-text-pos="below"] { flex-direction: column; }
+        .blog-desc-prosemirror figure.blog-figure--above,
+        .blog-desc-prosemirror [data-text-pos="above"] { flex-direction: column-reverse; }
+        .blog-desc-prosemirror figure.blog-figure--left,
+        .blog-desc-prosemirror [data-text-pos="left"] { flex-direction: row-reverse; align-items: center; }
+        .blog-desc-prosemirror figure.blog-figure--right,
+        .blog-desc-prosemirror [data-text-pos="right"] { flex-direction: row; align-items: center; }
+        .blog-desc-prosemirror figure.blog-figure > .blog-img-node,
+        .blog-desc-prosemirror [data-image-text] > .blog-img-node { flex: 0 0 auto; }
+        .blog-desc-prosemirror figure.blog-figure > p,
+        .blog-desc-prosemirror figure.blog-figure > h1,
+        .blog-desc-prosemirror figure.blog-figure > h2,
+        .blog-desc-prosemirror figure.blog-figure > h3,
+        .blog-desc-prosemirror figure.blog-figure > h4,
+        .blog-desc-prosemirror [data-image-text] > p,
+        .blog-desc-prosemirror [data-image-text] > h1,
+        .blog-desc-prosemirror [data-image-text] > h2,
+        .blog-desc-prosemirror [data-image-text] > h3,
+        .blog-desc-prosemirror [data-image-text] > h4 {
+          flex: 1 1 auto;
+          min-width: 120px;
+          margin: 0.25em 0;
+          line-height: 1.5;
+        }
+        .blog-desc-prosemirror .blog-card-editor {
+          flex: 1 1 180px;
+          min-width: 160px;
+          max-width: 100%;
+          border: 1px dashed #d1d5db;
+          border-radius: 0.5rem;
+          background: #fff;
+          overflow: hidden;
+        }
+        .blog-desc-prosemirror .blog-card-editor-bar {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 4px;
+          padding: 6px;
+          background: #f9fafb;
+          border-bottom: 1px solid #e5e7eb;
+        }
+        .blog-desc-prosemirror .blog-card-editor-btn {
+          border: 0;
+          border-radius: 4px;
+          background: #fff;
+          color: #374151;
+          font-size: 11px;
+          padding: 3px 8px;
+          cursor: pointer;
+          box-shadow: 0 0 0 1px #e5e7eb;
+        }
+        .blog-desc-prosemirror .blog-card-editor-btn:hover { background: #f3f4f6; }
+        .blog-desc-prosemirror .blog-card-editor-body {
+          min-height: 48px;
+          padding: 8px 10px;
+        }
+        .blog-desc-prosemirror .blog-card-editor-body[data-empty='1']::before {
+          content: 'Empty card — use + Image / + Title / + Text, then style text with the toolbar';
+          color: #9ca3af;
+          font-size: 12px;
         }
         .blog-desc-prosemirror .tableWrapper { overflow-x: auto; margin: 0.75rem 0; max-width: 100%; }
         .blog-desc-prosemirror table { border-collapse: collapse; table-layout: fixed; width: 100%; margin: 0; overflow: hidden; }
@@ -996,7 +1990,6 @@ export default function BlogDescriptionEditor({ value = '', onChange, onInlineIm
           <input type="color" defaultValue="#fef08a" className="absolute inset-0 cursor-pointer opacity-0" onChange={(e) => editor.chain().focus().toggleHighlight({ color: e.target.value }).run()} />
         </label>
 
-        {/* Font size */}
         <div className="relative">
           <ToolbarBtn title="Font size" active={menu === 'size'} onClick={() => toggleMenu('size')}>
             <span className="min-w-[1.25rem] text-center text-xs font-semibold">{currentFontSize}</span>
@@ -1027,7 +2020,6 @@ export default function BlogDescriptionEditor({ value = '', onChange, onInlineIm
           </Menu>
         </div>
 
-        {/* Paragraph */}
         <div className="relative">
           <ToolbarBtn title="Paragraph style" active={menu === 'block'} onClick={() => toggleMenu('block')}>
             <span className="min-w-[1.25rem] text-center text-xs font-semibold">{blockLabel}</span>
@@ -1045,7 +2037,6 @@ export default function BlogDescriptionEditor({ value = '', onChange, onInlineIm
 
         <span className="mx-1 h-5 w-px bg-gray-200" />
 
-        {/* Bullet styles */}
         <div className="relative">
           <ToolbarBtn title="Bullet list" active={editor.isActive('bulletList') || menu === 'ul'} onClick={() => toggleMenu('ul')}>
             <List size={15} />
@@ -1060,7 +2051,6 @@ export default function BlogDescriptionEditor({ value = '', onChange, onInlineIm
           </Menu>
         </div>
 
-        {/* Ordered styles */}
         <div className="relative">
           <ToolbarBtn title="Numbered list" active={editor.isActive('orderedList') || menu === 'ol'} onClick={() => toggleMenu('ol')}>
             <ListOrdered size={15} />
@@ -1081,22 +2071,143 @@ export default function BlogDescriptionEditor({ value = '', onChange, onInlineIm
         <ToolbarBtn title="Remove link" disabled={!editor.isActive('link')} onClick={() => editor.chain().focus().unsetLink().run()}>
           <Unlink size={15} />
         </ToolbarBtn>
+        {linkActive ? (
+          <select
+            title="Link follow type"
+            aria-label="Link follow type"
+            className="h-8 max-w-[108px] rounded-md border border-gray-200 bg-white px-2 text-xs text-gray-700"
+            value={linkFollow}
+            onChange={(e) => applyLinkFollow(e.target.value)}
+          >
+            <option value="nofollow">No follow</option>
+            <option value="dofollow">Do follow</option>
+          </select>
+        ) : null}
 
         <ToolbarBtn title="Clear formatting" onClick={() => editor.chain().focus().unsetAllMarks().setParagraph().run()}>
           <span className="text-[11px] font-bold tracking-tight">T<sub className="text-[8px]">x</sub></span>
         </ToolbarBtn>
 
-        <div className="relative">
-          <ToolbarBtn title="Upload image" onClick={() => fileInputRef.current?.click()}>
-            <ImagePlus size={15} />
-          </ToolbarBtn>
-        </div>
+        <ToolbarBtn title="Upload one image" onClick={() => fileInputRef.current?.click()}>
+          <ImagePlus size={15} />
+        </ToolbarBtn>
+
+        {/* Easy image layout: side-by-side vs stack */}
         <div className="relative">
           <ToolbarBtn
-            title="Image options"
-            active={editor.isActive('image') || menu === 'img'}
+            title="Images: side by side or stacked"
+            active={menu === 'layout' || inImageRow}
+            onClick={() => toggleMenu('layout')}
+          >
+            <Columns2 size={15} />
+            <ChevronDown size={11} />
+          </ToolbarBtn>
+          <Menu open={menu === 'layout'} onClose={closeMenu} className="w-72">
+            <MenuLabel>Move image</MenuLabel>
+            <MenuItem onClick={() => moveSelectedBlock('up')}>
+              <ArrowUp size={14} /> Move up
+            </MenuItem>
+            <MenuItem onClick={() => moveSelectedBlock('down')}>
+              <ArrowDown size={14} /> Move down
+            </MenuItem>
+            <div className="border-t border-gray-100 px-3 py-2 text-[11px] leading-snug text-gray-500">
+              Or click the image, then drag it to a new place in the content.
+            </div>
+
+            <div className="my-1 border-t border-gray-100" />
+            <MenuLabel>Easy layout</MenuLabel>
+            <MenuItem onClick={() => sideBySideInputRef.current?.click()}>
+              <Columns2 size={14} /> Insert side-by-side images…
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                if (!imageSelected && !inImageRow) {
+                  window.alert('Select an image first, then add another beside it.');
+                  return;
+                }
+                addBesideInputRef.current?.click();
+              }}
+            >
+              <Plus size={14} /> Add image beside selected
+            </MenuItem>
+            <MenuItem onClick={() => joinWithNeighbor('next')}>
+              <Columns2 size={14} /> Side by side with next image
+            </MenuItem>
+            <MenuItem onClick={() => joinWithNeighbor('prev')}>
+              <Columns2 size={14} /> Side by side with previous image
+            </MenuItem>
+            <MenuItem onClick={stackSeparately}>
+              <Rows3 size={14} /> Stack one under another
+            </MenuItem>
+
+            <div className="my-1 border-t border-gray-100" />
+            <MenuLabel>Align this group</MenuLabel>
+            <MenuItem active={currentRowAlign === 'left'} onClick={() => setRowAlign('left')}>
+              <AlignLeft size={14} /> Left
+            </MenuItem>
+            <MenuItem active={currentRowAlign === 'center'} onClick={() => setRowAlign('center')}>
+              <AlignCenter size={14} /> Middle / Center
+            </MenuItem>
+            <MenuItem active={currentRowAlign === 'right'} onClick={() => setRowAlign('right')}>
+              <AlignRight size={14} /> Right
+            </MenuItem>
+
+            <div className="my-1 border-t border-gray-100" />
+            <MenuLabel>Single image placement</MenuLabel>
+            <MenuItem onClick={() => setImageLayout('left')}><PanelLeft size={14} /> Image left + text</MenuItem>
+            <MenuItem onClick={() => setImageLayout('right')}><PanelRight size={14} /> Image right + text</MenuItem>
+            <MenuItem onClick={() => setImageLayout('top')}><Square size={14} /> Image on its own row</MenuItem>
+            <MenuItem onClick={() => setImageLayout('center')}><AlignCenter size={14} /> Image centered</MenuItem>
+            <MenuItem onClick={() => setImageLayout('wrap')}>Text wrap</MenuItem>
+          </Menu>
+        </div>
+
+        {/* Image text — real editable text, uses normal toolbar formatting */}
+        <div className="relative">
+          <ToolbarBtn
+            title="Text near image"
+            active={menu === 'caption' || inImageText}
             onClick={() => {
-              if (!editor.isActive('image')) {
+              if (!imageSelected && !inImageText) {
+                window.alert('Select an image first to add text near it.');
+                return;
+              }
+              toggleMenu('caption');
+            }}
+          >
+            <Type size={15} />
+            <ChevronDown size={11} />
+          </ToolbarBtn>
+          <Menu open={menu === 'caption'} onClose={closeMenu} className="w-72">
+            <MenuItem onClick={() => addTextNearImage('below')}>
+              <Type size={14} /> Add text near image
+            </MenuItem>
+            <MenuItem onClick={removeTextNearImage}>
+              <Trash2 size={14} /> Remove text near image
+            </MenuItem>
+            <div className="my-1 border-t border-gray-100" />
+            <MenuLabel>Text position</MenuLabel>
+            {CAPTION_POSITIONS.map((item) => (
+              <MenuItem
+                key={item.value}
+                active={currentCaptionPos === item.value}
+                onClick={() => setCaptionPos(item.value)}
+              >
+                {item.label}
+              </MenuItem>
+            ))}
+            <div className="border-t border-gray-100 px-3 py-2 text-[11px] leading-snug text-gray-500">
+              After adding text, click inside that text and use the top toolbar (font size, bold, italic, color, align) — same as normal text.
+            </div>
+          </Menu>
+        </div>
+
+        <div className="relative">
+          <ToolbarBtn
+            title="Image size"
+            active={imageSelected || menu === 'img'}
+            onClick={() => {
+              if (!imageSelected) {
                 window.alert('Select an image in the editor first.');
                 return;
               }
@@ -1107,13 +2218,8 @@ export default function BlogDescriptionEditor({ value = '', onChange, onInlineIm
             <ChevronDown size={11} />
           </ToolbarBtn>
           <Menu open={menu === 'img'} onClose={closeMenu} className="w-56">
-            <MenuItem onClick={() => setImageLayout('left')}><PanelLeft size={14} /> Image Left + text right</MenuItem>
-            <MenuItem onClick={() => setImageLayout('right')}><PanelRight size={14} /> Image Right + text left</MenuItem>
-            <MenuItem onClick={() => setImageLayout('top')}><Square size={14} /> Image Top</MenuItem>
-            <MenuItem onClick={() => setImageLayout('wrap')}>Text Wrap</MenuItem>
-            <div className="my-1 border-t border-gray-100" />
             <div className="px-3 py-2">
-              <p className="mb-1 text-[11px] text-gray-500">Any width (px) — or drag image corners</p>
+              <p className="mb-1 text-[11px] text-gray-500">Width (px) — or drag image corners. Size follows your upload by default.</p>
               <div className="flex items-center gap-1">
                 <input
                   value={customImageWidth || (editor.getAttributes('image')?.width ?? '')}
@@ -1129,12 +2235,53 @@ export default function BlogDescriptionEditor({ value = '', onChange, onInlineIm
                   Apply
                 </button>
               </div>
-              <p className="mt-2 text-[11px] text-gray-500">Use ⠿ on the image to drag/move it in the content.</p>
             </div>
           </Menu>
         </div>
 
-        {/* Text align */}
+        {/* Cards */}
+        <div className="relative">
+          <ToolbarBtn title="Cards section" active={menu === 'cards' || inCardRow} onClick={() => toggleMenu('cards')}>
+            <LayoutGrid size={15} />
+            <ChevronDown size={11} />
+          </ToolbarBtn>
+          <Menu open={menu === 'cards'} onClose={closeMenu} className="w-72">
+            <MenuItem
+              onClick={() => {
+                editor.chain().focus().insertCardRow('left').run();
+                closeMenu();
+              }}
+            >
+              <Plus size={14} /> Insert cards row
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                if (!editor.commands.addCardToRow()) {
+                  window.alert('Click inside a cards row first, then add another card.');
+                  return;
+                }
+                closeMenu();
+              }}
+            >
+              <Plus size={14} /> Add another card
+            </MenuItem>
+            <div className="my-1 border-t border-gray-100" />
+            <MenuLabel>Align cards row</MenuLabel>
+            <MenuItem active={inCardRow && currentRowAlign === 'left'} onClick={() => setRowAlign('left')}>
+              <AlignLeft size={14} /> Left
+            </MenuItem>
+            <MenuItem active={inCardRow && currentRowAlign === 'center'} onClick={() => setRowAlign('center')}>
+              <AlignCenter size={14} /> Middle / Center
+            </MenuItem>
+            <MenuItem active={inCardRow && currentRowAlign === 'right'} onClick={() => setRowAlign('right')}>
+              <AlignRight size={14} /> Right
+            </MenuItem>
+            <div className="border-t border-gray-100 px-3 py-2 text-[11px] leading-snug text-gray-500">
+              Cards start empty. Use + Image / + Title / + Text on each card. Style text with the top toolbar — cards use the portal theme on the live site.
+            </div>
+          </Menu>
+        </div>
+
         <div className="relative">
           <ToolbarBtn title="Text align" active={menu === 'align'} onClick={() => toggleMenu('align')}>
             <AlignLeft size={15} />
@@ -1156,37 +2303,6 @@ export default function BlogDescriptionEditor({ value = '', onChange, onInlineIm
           </Menu>
         </div>
 
-        {/* Image layout / blocks */}
-        <div className="relative">
-          <ToolbarBtn title="Image layout" active={menu === 'layout'} onClick={() => toggleMenu('layout')}>
-            <Columns2 size={15} />
-            <ChevronDown size={11} />
-          </ToolbarBtn>
-          <Menu open={menu === 'layout'} onClose={closeMenu} className="w-56">
-            <MenuItem onClick={() => setImageLayout('left')}>
-              <span className="flex w-8 gap-0.5"><span className="h-6 w-3 rounded bg-blue-200" /><span className="flex flex-1 flex-col justify-center gap-0.5"><i className="block h-0.5 bg-gray-300" /><i className="block h-0.5 bg-gray-300" /></span></span>
-              Image Left
-            </MenuItem>
-            <MenuItem onClick={() => setImageLayout('right')}>
-              <span className="flex w-8 gap-0.5"><span className="flex flex-1 flex-col justify-center gap-0.5"><i className="block h-0.5 bg-gray-300" /><i className="block h-0.5 bg-gray-300" /></span><span className="h-6 w-3 rounded bg-blue-200" /></span>
-              Image Right
-            </MenuItem>
-            <MenuItem onClick={() => setImageLayout('top')}>
-              <span className="flex w-8 flex-col gap-0.5"><span className="h-3 w-full rounded bg-blue-200" /><i className="block h-0.5 bg-gray-300" /><i className="block h-0.5 bg-gray-300" /></span>
-              Image Top
-            </MenuItem>
-            <MenuItem onClick={() => setImageLayout('wrap')}>
-              Text Wrap
-            </MenuItem>
-            <div className="border-t border-gray-100 px-3 py-2 text-[11px] leading-snug text-gray-500">
-              Drag an image anywhere to move it. Drop onto another image (left or right half) to place them side by side.
-            </div>
-          </Menu>
-        </div>
-
-        {/* Slider excluded */}
-
-        {/* Table */}
         <div className="relative">
           <ToolbarBtn title="Table" active={menu === 'table'} onClick={() => toggleMenu('table')}>
             <TableIcon size={15} />
@@ -1283,12 +2399,34 @@ export default function BlogDescriptionEditor({ value = '', onChange, onInlineIm
             e.target.value = '';
           }}
         />
+        <input
+          ref={sideBySideInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            insertSideBySideFromFiles(e.target.files);
+            e.target.value = '';
+          }}
+        />
+        <input
+          ref={addBesideInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            addImagesBeside(e.target.files);
+            e.target.value = '';
+          }}
+        />
       </div>
 
       {showPreview ? (
         <div
           className={`blog-desc-preview ${BLOG_RENDERED_CONTENT_CLASS}`}
-          dangerouslySetInnerHTML={{ __html: editor.getHTML() }}
+          dangerouslySetInnerHTML={{ __html: sanitizeBlogEditorHtml(editor.getHTML()) }}
         />
       ) : showSource ? (
         <textarea
