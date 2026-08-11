@@ -19,6 +19,35 @@ const TABS = [
   { id: 'footer', label: 'Footer' },
 ];
 
+const SHOWCASE_SPEED_OPTIONS = [
+  { value: 0.5, label: '0.5 sec' },
+  { value: 0.7, label: '0.7 sec' },
+  { value: 0.85, label: '0.85 sec' },
+  { value: 1, label: '1 sec' },
+  { value: 1.5, label: '1.5 sec' },
+  { value: 2, label: '2 sec' },
+  { value: 2.5, label: '2.5 sec' },
+  { value: 3, label: '3 sec' },
+  { value: 3.5, label: '3.5 sec' },
+  { value: 4, label: '4 sec' },
+  { value: 4.5, label: '4.5 sec' },
+];
+
+function snapShowcaseSpeed(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return 1;
+  let best = SHOWCASE_SPEED_OPTIONS[SHOWCASE_SPEED_OPTIONS.length - 1].value;
+  let bestDiff = Math.abs(best - n);
+  for (const option of SHOWCASE_SPEED_OPTIONS) {
+    const diff = Math.abs(option.value - n);
+    if (diff < bestDiff) {
+      best = option.value;
+      bestDiff = diff;
+    }
+  }
+  return best;
+}
+
 const WHO_ICONS = ['Gem', 'Store', 'Palette', 'Share2'];
 
 const FOOTER_LOGO_PRESET = '/images/SplashLogoPNG.png';
@@ -94,6 +123,7 @@ export default function HomeContentPage() {
     title_html: '',
     cta_text: '',
     cta_href: '/gallery',
+    marquee_seconds: 1,
   });
   const [how, setHow] = useState({
     eye_label: '',
@@ -158,6 +188,7 @@ export default function HomeContentPage() {
           title_html: data.showcase.title_html ?? data.showcase.heading ?? '',
           cta_text: data.showcase.cta_text ?? '',
           cta_href: data.showcase.cta_href ?? '/gallery',
+          marquee_seconds: snapShowcaseSpeed(data.showcase.marquee_seconds),
         });
       }
       if (data.how) {
@@ -273,7 +304,11 @@ export default function HomeContentPage() {
       case 'ticker':
         return ticker.filter((t) => t.strong || t.span);
       case 'showcase':
-        return { ...showcase, cta_href: showcase.cta_href || '/gallery' };
+        return {
+          ...showcase,
+          cta_href: showcase.cta_href || '/gallery',
+          marquee_seconds: snapShowcaseSpeed(showcase.marquee_seconds),
+        };
       case 'how':
         return how;
       case 'output':
@@ -420,7 +455,7 @@ export default function HomeContentPage() {
           <>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Showcase Text</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
-              Images in the showcase grid come from <strong>Public Gallery → Homepage Showcase</strong>. This tab only edits headings and the View All button.
+              Images in the showcase carousel come from <strong>Public Gallery</strong> (one per aspect ratio). This tab edits headings, View All, and how long each image stays centered.
             </p>
             <div><label className={labelClass}>Section label</label><input type="text" value={showcase.eye_label} onChange={(e) => setShowcase({ ...showcase, eye_label: e.target.value })} className={inputClass} /></div>
             <div><label className={labelClass}>Title (HTML)</label><textarea value={showcase.title_html} onChange={(e) => setShowcase({ ...showcase, title_html: e.target.value })} rows={2} className={inputClass} /></div>
@@ -431,6 +466,23 @@ export default function HomeContentPage() {
                 <input type="text" value={showcase.cta_href} onChange={(e) => setShowcase({ ...showcase, cta_href: e.target.value })} className={inputClass} placeholder="/gallery" />
                 <p className={hintClass}>Links to the public gallery page. Images are managed separately.</p>
               </div>
+            </div>
+            <div>
+              <label className={labelClass}>Center hold time</label>
+              <select
+                value={String(snapShowcaseSpeed(showcase.marquee_seconds))}
+                onChange={(e) => setShowcase({ ...showcase, marquee_seconds: Number(e.target.value) })}
+                className={inputClass}
+              >
+                {SHOWCASE_SPEED_OPTIONS.map((option) => (
+                  <option key={option.value} value={String(option.value)}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <p className={hintClass}>
+                Each image pauses in the center for this duration, then the next comes from the right and the current moves left.
+              </p>
             </div>
           </>
         )}

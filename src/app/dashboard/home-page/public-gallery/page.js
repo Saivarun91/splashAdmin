@@ -27,13 +27,62 @@ const IMAGE_TYPES = [
   { value: 'background_change', label: 'Background change', layout: 'product' },
 ];
 
+const ASPECT_RATIOS = [
+  '1:1',
+  '4:5',
+  '5:4',
+  '3:4',
+  '4:3',
+  '2:3',
+  '3:2',
+  '9:16',
+  '16:9',
+  '21:9',
+];
+
+const SHOWCASE_SPEED_OPTIONS = [
+  { value: 0.5, label: '0.5 sec' },
+  { value: 0.7, label: '0.7 sec' },
+  { value: 0.85, label: '0.85 sec' },
+  { value: 1, label: '1 sec' },
+  { value: 1.5, label: '1.5 sec' },
+  { value: 2, label: '2 sec' },
+  { value: 2.5, label: '2.5 sec' },
+  { value: 3, label: '3 sec' },
+  { value: 3.5, label: '3.5 sec' },
+  { value: 4, label: '4 sec' },
+  { value: 4.5, label: '4.5 sec' },
+];
+
+function snapShowcaseSpeed(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return 1;
+  let best = SHOWCASE_SPEED_OPTIONS[SHOWCASE_SPEED_OPTIONS.length - 1].value;
+  let bestDiff = Math.abs(best - n);
+  for (const option of SHOWCASE_SPEED_OPTIONS) {
+    const diff = Math.abs(option.value - n);
+    if (diff < bestDiff) {
+      best = option.value;
+      bestDiff = diff;
+    }
+  }
+  return best;
+}
+
 const VISIBILITY_OPTIONS = [
   {
     value: 'gallery_and_homepage',
-    label: 'Gallery + Homepage',
+    label: 'Gallery + Showcase',
     shortLabel: 'Both',
-    description: 'Visible on /gallery and the homepage showcase',
+    description: 'Visible on /gallery and the homepage marquee',
     badgeClass: 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200',
+  },
+  {
+    value: 'showcase_only',
+    label: 'Showcase only',
+    shortLabel: 'Showcase',
+    description: 'Homepage marquee only (not on /gallery)',
+    badgeClass: 'bg-violet-100 text-violet-900 dark:bg-violet-900/30 dark:text-violet-200',
   },
   {
     value: 'gallery_only',
@@ -53,7 +102,8 @@ const VISIBILITY_OPTIONS = [
 
 const FILTER_TABS = [
   { id: 'all', label: 'All CMS images' },
-  { id: 'gallery_and_homepage', label: 'Gallery + Homepage' },
+  { id: 'gallery_and_homepage', label: 'Gallery + Showcase' },
+  { id: 'showcase_only', label: 'Showcase only' },
   { id: 'gallery_only', label: 'Gallery only' },
   { id: 'hidden', label: 'Hidden' },
 ];
@@ -70,6 +120,8 @@ function isTruthy(value) {
 }
 
 function getVisibility(img) {
+  if (img?.visibility) return img.visibility;
+  if (!isTruthy(img.is_active) && isTruthy(img.show_on_homepage)) return 'showcase_only';
   if (!isTruthy(img.is_active)) return 'hidden';
   if (isTruthy(img.show_on_homepage)) return 'gallery_and_homepage';
   return 'gallery_only';
@@ -77,16 +129,23 @@ function getVisibility(img) {
 
 function visibilityToPayload(value) {
   if (value === 'hidden') {
-    return { is_active: 'false', show_on_homepage: false };
+    return { visibility: 'hidden', is_active: 'false', show_on_homepage: false };
+  }
+  if (value === 'showcase_only') {
+    return { visibility: 'showcase_only', is_active: 'false', show_on_homepage: true };
   }
   if (value === 'gallery_and_homepage') {
-    return { is_active: 'true', show_on_homepage: true };
+    return { visibility: 'gallery_and_homepage', is_active: 'true', show_on_homepage: true };
   }
-  return { is_active: 'true', show_on_homepage: false };
+  return { visibility: 'gallery_only', is_active: 'true', show_on_homepage: false };
 }
 
 function getVisibilityMeta(value) {
-  return VISIBILITY_OPTIONS.find((option) => option.value === value) || VISIBILITY_OPTIONS[1];
+  return VISIBILITY_OPTIONS.find((option) => option.value === value) || VISIBILITY_OPTIONS[2];
+}
+
+function needsAspectRatio(visibility) {
+  return visibility === 'gallery_and_homepage' || visibility === 'showcase_only';
 }
 
 function LiveImageGrid({ images, emptyText, onPreview }) {
@@ -144,10 +203,14 @@ export default function PublicGalleryAdminPage() {
     label: '',
     alt_text: '',
     visibility: 'gallery_only',
+    aspect_ratio: '1:1',
   });
+  const [marqueeSeconds, setMarqueeSeconds] = useState(1);
+  const [savingSpeed, setSavingSpeed] = useState(false);
 
   useEffect(() => {
     fetchOverview();
+    fetchShowcaseSpeed();
   }, []);
 
   const liveGallery = overview?.live?.gallery_images || [];
@@ -155,12 +218,23 @@ export default function PublicGalleryAdminPage() {
   const gallerySource = overview?.live?.gallery_source || 'empty';
   const showcaseSource = overview?.live?.showcase_source || 'empty';
   const filesystemCatalog = overview?.catalog?.filesystem_gallery || [];
-  const defaultShowcaseCatalog = overview?.catalog?.default_showcase || [];
+  const showcaseSlots = overview?.showcase_slots || ASPECT_RATIOS.map((ratio) => ({
+    aspect_ratio: ratio,
+    filled: false,
+    image: null,
+  }));
 
   const counts = useMemo(() => {
-    const tally = { all: images.length, gallery_and_homepage: 0, gallery_only: 0, hidden: 0 };
+    const tally = {
+      all: images.length,
+      gallery_and_homepage: 0,
+      showcase_only: 0,
+      gallery_only: 0,
+      hidden: 0,
+    };
     images.forEach((img) => {
-      tally[getVisibility(img)] += 1;
+      const key = getVisibility(img);
+      if (tally[key] !== undefined) tally[key] += 1;
     });
     return tally;
   }, [images]);
@@ -171,7 +245,7 @@ export default function PublicGalleryAdminPage() {
   }, [images, activeFilter]);
 
   const usingLegacyGallery = gallerySource !== 'cms';
-  const usingLegacyShowcase = showcaseSource !== 'cms';
+  // showcaseSource empty is expected until admin fills aspect-ratio slots
 
   const fetchOverview = async () => {
     try {
@@ -187,6 +261,39 @@ export default function PublicGalleryAdminPage() {
       setMessage({ type: 'error', text: error.message || 'Failed to load gallery overview' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchShowcaseSpeed = async () => {
+    try {
+      const res = await homepageAPI.getPageContentAdmin('home');
+      if (res.success && res.content?.showcase) {
+        setMarqueeSeconds(snapShowcaseSpeed(res.content.showcase.marquee_seconds));
+      }
+    } catch {
+      /* keep default */
+    }
+  };
+
+  const handleSpeedChange = async (nextValue) => {
+    const speed = snapShowcaseSpeed(nextValue);
+    const previous = marqueeSeconds;
+    setMarqueeSeconds(speed);
+    try {
+      setSavingSpeed(true);
+      setMessage({ type: '', text: '' });
+      const res = await homepageAPI.getPageContentAdmin('home');
+      const full = res.success && res.content ? res.content : {};
+      const showcase = { ...(full.showcase || {}) };
+      delete showcase.images;
+      showcase.marquee_seconds = speed;
+      await homepageAPI.updatePageContent('home', { ...full, showcase });
+      setMessage({ type: 'success', text: `Showcase center hold set to ${speed} sec.` });
+    } catch (error) {
+      setMarqueeSeconds(previous);
+      setMessage({ type: 'error', text: error.message || 'Failed to save showcase speed' });
+    } finally {
+      setSavingSpeed(false);
     }
   };
 
@@ -226,6 +333,11 @@ export default function PublicGalleryAdminPage() {
       return;
     }
 
+    if (needsAspectRatio(form.visibility) && !form.aspect_ratio) {
+      setMessage({ type: 'error', text: 'Select an aspect ratio for showcase placement.' });
+      return;
+    }
+
     const typeConfig = IMAGE_TYPES.find((t) => t.value === form.image_type) || IMAGE_TYPES[2];
     const placement = visibilityToPayload(form.visibility);
 
@@ -237,14 +349,22 @@ export default function PublicGalleryAdminPage() {
         label: form.label || typeConfig.label,
         alt_text: form.alt_text || form.label || typeConfig.label,
         homepage_layout: typeConfig.layout,
+        visibility: form.visibility,
+        aspect_ratio: form.aspect_ratio || '',
         show_on_homepage: placement.show_on_homepage ? 'true' : 'false',
         is_active: placement.is_active,
       });
 
       if (response.success) {
-        setMessage({ type: 'success', text: 'Image uploaded successfully!' });
+        setMessage({ type: 'success', text: 'Image uploaded to local media successfully!' });
         setImageFile(null);
-        setForm({ image_type: 'product', label: '', alt_text: '', visibility: 'gallery_only' });
+        setForm({
+          image_type: 'product',
+          label: '',
+          alt_text: '',
+          visibility: 'gallery_only',
+          aspect_ratio: '1:1',
+        });
         if (input) input.value = '';
         fetchOverview();
       } else {
@@ -275,7 +395,19 @@ export default function PublicGalleryAdminPage() {
   const handleVisibilityChange = async (imageId, nextVisibility) => {
     try {
       setSavingId(imageId);
+      const img = images.find((item) => item.id === imageId);
       const payload = visibilityToPayload(nextVisibility);
+      if (needsAspectRatio(nextVisibility) && !img?.aspect_ratio) {
+        setMessage({
+          type: 'error',
+          text: 'Set an aspect ratio on this image before placing it on the showcase.',
+        });
+        setSavingId(null);
+        return;
+      }
+      if (img?.aspect_ratio) {
+        payload.aspect_ratio = img.aspect_ratio;
+      }
       const response = await homepageAPI.updatePublicGalleryImage(imageId, payload);
       if (response.success) {
         fetchOverview();
@@ -284,6 +416,7 @@ export default function PublicGalleryAdminPage() {
             prev
               ? {
                   ...prev,
+                  visibility: nextVisibility,
                   is_active: payload.is_active,
                   show_on_homepage: payload.show_on_homepage ? 'true' : 'false',
                 }
@@ -295,6 +428,24 @@ export default function PublicGalleryAdminPage() {
       }
     } catch (error) {
       setMessage({ type: 'error', text: error.message || 'Failed to update visibility' });
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const handleAspectRatioChange = async (imageId, aspectRatio) => {
+    try {
+      setSavingId(imageId);
+      const response = await homepageAPI.updatePublicGalleryImage(imageId, {
+        aspect_ratio: aspectRatio,
+      });
+      if (response.success) {
+        fetchOverview();
+      } else {
+        setMessage({ type: 'error', text: response.error || 'Failed to update aspect ratio' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: error.message || 'Failed to update aspect ratio' });
     } finally {
       setSavingId(null);
     }
@@ -353,34 +504,63 @@ export default function PublicGalleryAdminPage() {
           <div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
               <Home className="w-5 h-5 text-amber-600" />
-              Currently live — Homepage showcase
+              Homepage showcase slots (10 dimensions)
             </h2>
             <p className="text-sm text-gray-500 mt-1">
-              Source: {SOURCE_LABELS[showcaseSource] || showcaseSource}
-              {usingLegacyShowcase ? ' — import below to manage in CMS' : ''}
+              One image per aspect ratio on the marquee. Empty slots stay hidden until uploaded.
+              {showcaseSource !== 'empty' ? ` Source: ${SOURCE_LABELS[showcaseSource] || showcaseSource}.` : ''}
             </p>
           </div>
-          {usingLegacyShowcase && defaultShowcaseCatalog.length > 0 && (
-            <button
-              type="button"
-              onClick={() => handleImportPreset('default_showcase', 'gallery_and_homepage')}
-              disabled={importing === 'default_showcase'}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 text-sm"
+          <div className="flex items-center gap-2 shrink-0">
+            <label htmlFor="showcase-speed" className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+              Center hold
+            </label>
+            <select
+              id="showcase-speed"
+              value={String(snapShowcaseSpeed(marqueeSeconds))}
+              disabled={savingSpeed}
+              onChange={(e) => handleSpeedChange(e.target.value)}
+              className="min-w-[140px] px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white disabled:opacity-60"
             >
-              {importing === 'default_showcase' ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Download className="w-4 h-4" />
-              )}
-              Import showcase into CMS
-            </button>
-          )}
+              {SHOWCASE_SPEED_OPTIONS.map((option) => (
+                <option key={option.value} value={String(option.value)}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {savingSpeed && <Loader2 className="w-4 h-4 animate-spin text-blue-600" />}
+          </div>
         </div>
-        <LiveImageGrid
-          images={liveShowcase}
-          emptyText="No showcase images are live right now."
-          onPreview={setPreviewImage}
-        />
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+          {showcaseSlots.map((slot) => (
+            <div
+              key={slot.aspect_ratio}
+              className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden"
+            >
+              <div className="aspect-square bg-gray-100 dark:bg-gray-800 relative">
+                {slot.image ? (
+                  <button type="button" className="absolute inset-0" onClick={() => setPreviewImage(slot.image)}>
+                    <SmartImage
+                      src={slot.image.src || slot.image.image_url}
+                      fill
+                      sizes="20vw"
+                      alt={slot.image.alt || slot.aspect_ratio}
+                      className="object-cover"
+                    />
+                  </button>
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-400">
+                    Empty
+                  </div>
+                )}
+              </div>
+              <div className="p-2 text-center">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">{slot.aspect_ratio}</p>
+                <p className="text-xs text-gray-500">{slot.filled ? 'Filled' : 'Waiting for upload'}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="space-y-4">
@@ -418,21 +598,25 @@ export default function PublicGalleryAdminPage() {
         />
       </section>
 
-      {(usingLegacyGallery || usingLegacyShowcase) && (
+      {usingLegacyGallery && (
         <div className="rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-900/10 p-4 text-sm text-amber-900 dark:text-amber-100">
-          The public site is still using static files because CMS has no active images yet.
-          Use the import buttons above to copy them into CMS, then you can set Gallery only / Gallery + Homepage per image.
+          The gallery page is still using static files because CMS has no active gallery images yet.
+          Import or upload images to manage them locally from CMS.
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
           <p className="text-sm text-gray-500">CMS images</p>
           <p className="text-2xl font-bold text-gray-900 dark:text-white">{counts.all}</p>
         </div>
         <div className="rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-900/10 p-4">
-          <p className="text-sm text-amber-800 dark:text-amber-200">Gallery + Homepage</p>
+          <p className="text-sm text-amber-800 dark:text-amber-200">Both</p>
           <p className="text-2xl font-bold text-amber-900 dark:text-amber-100">{counts.gallery_and_homepage}</p>
+        </div>
+        <div className="rounded-xl border border-violet-200 dark:border-violet-900/40 bg-violet-50 dark:bg-violet-900/10 p-4">
+          <p className="text-sm text-violet-800 dark:text-violet-200">Showcase only</p>
+          <p className="text-2xl font-bold text-violet-900 dark:text-violet-100">{counts.showcase_only}</p>
         </div>
         <div className="rounded-xl border border-blue-200 dark:border-blue-900/40 bg-blue-50 dark:bg-blue-900/10 p-4">
           <p className="text-sm text-blue-800 dark:text-blue-200">Gallery only</p>
@@ -448,7 +632,10 @@ export default function PublicGalleryAdminPage() {
         className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 space-y-4"
         onSubmit={handleUpload}
       >
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Upload new image to CMS</h2>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Upload new image (local storage)</h2>
+        <p className="text-sm text-gray-500">
+          New uploads are stored on the server under media — Cloudinary is not used for gallery/showcase.
+        </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium mb-2" htmlFor="public-gallery-image-input">
@@ -499,7 +686,7 @@ export default function PublicGalleryAdminPage() {
               className="w-full px-3 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700"
             />
           </div>
-          <div className="md:col-span-2">
+          <div>
             <label className="block text-sm font-medium mb-2">Where should this appear?</label>
             <select
               value={form.visibility}
@@ -512,6 +699,27 @@ export default function PublicGalleryAdminPage() {
                 </option>
               ))}
             </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Aspect ratio {needsAspectRatio(form.visibility) ? '(required for showcase)' : '(optional)'}
+            </label>
+            <select
+              value={form.aspect_ratio}
+              onChange={(e) => setForm((prev) => ({ ...prev, aspect_ratio: e.target.value }))}
+              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700"
+            >
+              {ASPECT_RATIOS.map((ratio) => (
+                <option key={ratio} value={ratio}>
+                  {ratio}
+                </option>
+              ))}
+            </select>
+            {needsAspectRatio(form.visibility) && (
+              <p className="mt-1 text-xs text-gray-500">
+                Uploading to a ratio that already has a showcase image will replace that slot.
+              </p>
+            )}
           </div>
         </div>
         <button
@@ -611,6 +819,25 @@ export default function PublicGalleryAdminPage() {
                         {VISIBILITY_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>
                             {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                        Aspect ratio
+                      </label>
+                      <select
+                        value={img.aspect_ratio || ''}
+                        disabled={savingId === img.id}
+                        onChange={(e) => handleAspectRatioChange(img.id, e.target.value)}
+                        className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-gray-800 dark:border-gray-700 disabled:opacity-60"
+                      >
+                        <option value="">Not set</option>
+                        {ASPECT_RATIOS.map((ratio) => (
+                          <option key={ratio} value={ratio}>
+                            {ratio}
                           </option>
                         ))}
                       </select>

@@ -7,7 +7,7 @@ const sections = [
   { name: 'Blog', href: '/dashboard/home-page/blog', icon: FileText, description: 'Create, edit, search, and delete blog posts' },
   { name: 'Before After', href: '/dashboard/home-page/before-after', icon: Image, description: 'Before/after image pairs on home' },
   { name: 'Home Content', href: '/dashboard/home-page/home-content', icon: FileText, description: 'Homepage sections + shared marketing footer links' },
-  { name: 'Public Gallery', href: '/dashboard/home-page/public-gallery', icon: Image, description: 'Gallery images and homepage showcase grid' },
+  { name: 'Public Gallery', href: '/dashboard/home-page/public-gallery', icon: Image, description: 'Gallery images and homepage showcase marquee (10 aspect ratios)' },
   { name: 'Contact Page', href: '/dashboard/home-page/contact', icon: MessageSquare, description: 'Contact page details and form copy' },
   { name: 'FAQs Page', href: '/dashboard/home-page/faqs', icon: HelpCircle, description: 'FAQs page questions and answers' },
   { name: 'About', href: '/dashboard/home-page/about', icon: BookOpen, description: 'About page content and images' },
