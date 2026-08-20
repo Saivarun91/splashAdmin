@@ -393,6 +393,47 @@ export const homepageAPI = {
   createBlog: (formData) => uploadMultipart('/admin/blog/add', formData, 'POST'),
   updateBlog: (id, formData) => uploadMultipart(`/admin/blog/update/${id}`, formData, 'POST'),
   deleteBlog: (id) => apiRequest(`/admin/blog/delete/${id}`, { method: 'DELETE' }),
+
+  listLandingPages: (page = 1, query = '', filters = {}) => {
+    const params = new URLSearchParams({ page: String(page) });
+    if (query && String(query).trim()) params.set('query', String(query).trim());
+    if (filters.type) params.set('type', filters.type);
+    if (filters.status) params.set('status', filters.status);
+    return apiRequest(`/admin/landing-pages/listing?${params.toString()}`);
+  },
+  getLandingPage: (id) => apiRequest(`/admin/landing-pages/details/${id}`),
+  createLandingPage: (data) => apiRequest('/admin/landing-pages/add', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  updateLandingPage: (id, data) => apiRequest(`/admin/landing-pages/update/${id}`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  deleteLandingPage: (id) => apiRequest(`/admin/landing-pages/delete/${id}`, { method: 'DELETE' }),
+  publishLandingPage: (id) => apiRequest(`/admin/landing-pages/publish/${id}`, { method: 'POST' }),
+  unpublishLandingPage: (id) => apiRequest(`/admin/landing-pages/unpublish/${id}`, { method: 'POST' }),
+  listGenerateCards: () => apiRequest('/admin/landing-pages/generate-cards'),
+  createGenerateCard: (data) => apiRequest('/admin/landing-pages/generate-cards', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  updateGenerateCard: (id, data) => apiRequest(`/admin/landing-pages/generate-cards/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+  deleteGenerateCard: (id) => apiRequest(`/admin/landing-pages/generate-cards/${id}`, { method: 'DELETE' }),
+  listEcommerceCards: () => apiRequest('/admin/landing-pages/ecommerce-cards'),
+  createEcommerceCard: (data) => apiRequest('/admin/landing-pages/ecommerce-cards', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  updateEcommerceCard: (id, data) => apiRequest(`/admin/landing-pages/ecommerce-cards/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+  deleteEcommerceCard: (id) => apiRequest(`/admin/landing-pages/ecommerce-cards/${id}`, { method: 'DELETE' }),
+  listAspectRatios: () => apiRequest('/admin/landing-pages/aspect-ratios'),
   downloadBlog: async (id) => {
     const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
     const token =

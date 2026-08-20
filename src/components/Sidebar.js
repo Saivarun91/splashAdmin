@@ -225,6 +225,19 @@ export default function Sidebar() {
                           <span className="ml-4">Blog</span>
                         </Link>
                         <Link
+                          href="/dashboard/home-page/landing-pages"
+                          onClick={() => setIsMobileOpen(false)}
+                          className={`
+                            flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm
+                            ${pathname?.startsWith('/dashboard/home-page/landing-pages')
+                              ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-600 dark:text-blue-400 font-semibold'
+                              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                            }
+                          `}
+                        >
+                          <span className="ml-4">Landing Pages</span>
+                        </Link>
+                        <Link
                           href="/dashboard/home-page/before-after"
                           onClick={() => setIsMobileOpen(false)}
                           className={`

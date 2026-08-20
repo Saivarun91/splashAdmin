@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Image, FileText, BookOpen, Target, Video, Shield, MessageSquare, HelpCircle } from 'lucide-react';
 
 const sections = [
+  { name: 'Landing Pages', href: '/dashboard/home-page/landing-pages', icon: FileText, description: 'Create SEO Feature, Product, and Industry landing pages' },
   { name: 'Blog', href: '/dashboard/home-page/blog', icon: FileText, description: 'Create, edit, search, and delete blog posts' },
   { name: 'Before After', href: '/dashboard/home-page/before-after', icon: Image, description: 'Before/after image pairs on home' },
   { name: 'Home Content', href: '/dashboard/home-page/home-content', icon: FileText, description: 'Homepage sections + shared marketing footer links' },
