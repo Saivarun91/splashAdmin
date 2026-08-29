@@ -107,9 +107,13 @@ export default function LoginSignupAdminPage() {
     if (!file) return;
     try {
       setUploading(key);
-      const { url } = await homepageAPI.uploadContentImage(file);
-      setImages((prev) => ({ ...prev, [key]: url }));
+      const maxWidth = key === 'small_url' ? 480 : 960;
+      const { url } = await homepageAPI.uploadContentImage(file, { max_width: maxWidth });
+      const nextImages = { ...images, [key]: url };
+      setImages(nextImages);
       setPreviewFailed((prev) => ({ ...prev, [key]: false }));
+      await homepageAPI.updatePageContent('auth', { images: nextImages, login, signup });
+      setMessage({ type: 'success', text: 'Image replaced on login and signup.' });
     } catch (e) {
       setMessage({ type: 'error', text: e.message || 'Upload failed' });
     } finally {
@@ -153,7 +157,7 @@ export default function LoginSignupAdminPage() {
               setPreviewFailed((prev) => ({ ...prev, [urlKey]: false }));
             }}
             className={inputClass}
-            placeholder="/images/login-1.jpg"
+            placeholder="Upload an image"
           />
           <label className="flex items-center gap-1 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg cursor-pointer text-sm shrink-0">
             <Upload size={16} />
@@ -220,6 +224,7 @@ export default function LoginSignupAdminPage() {
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Shared images</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400">
           These two images appear on login, signup, forgot password, and reset password.
+          Uploading a file replaces the previous image on the live pages immediately.
         </p>
         <div className="grid md:grid-cols-2 gap-4">
           <ImageField

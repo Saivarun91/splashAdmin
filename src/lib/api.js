@@ -465,9 +465,14 @@ export const homepageAPI = {
   getAllSupportRequests: () => apiRequest('/api/homepage/support/all/'),
 
   // Admin: Upload content image (returns { url })
-  uploadContentImage: async (file) => {
+  uploadContentImage: async (file, fields = {}) => {
     const formData = new FormData();
     formData.append('image', file);
+    Object.entries(fields).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        formData.append(key, String(value));
+      }
+    });
     return uploadMultipart('/api/homepage/upload-image/', formData);
   },
 };
