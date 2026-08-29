@@ -2,6 +2,23 @@ export function isHttpUrl(src) {
   return /^https?:\/\//i.test(src || "");
 }
 
+export function getPublicSiteOrigin() {
+  const fromEnv = (
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXT_PUBLIC_FRONTEND_URL ||
+    process.env.NEXT_PUBLIC_URL ||
+    ""
+  ).replace(/\/$/, "");
+  if (fromEnv) return fromEnv;
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host === "localhost" || host === "127.0.0.1") {
+      return "http://localhost:3000";
+    }
+  }
+  return "https://gosplash.ai";
+}
+
 function getApiBaseUrl() {
   return (
     process.env.NEXT_PUBLIC_API_BASE_URL ||

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Image, FileText, BookOpen, Target, Video, Shield, MessageSquare, HelpCircle } from 'lucide-react';
+import { Image, FileText, BookOpen, Target, Video, Shield, MessageSquare, HelpCircle, LogIn } from 'lucide-react';
 
 const sections = [
   { name: 'Landing Pages', href: '/dashboard/home-page/landing-pages', icon: FileText, description: 'Create SEO Feature, Product, and Industry landing pages' },
@@ -10,6 +10,7 @@ const sections = [
   { name: 'Home Content', href: '/dashboard/home-page/home-content', icon: FileText, description: 'Homepage sections + shared marketing footer links' },
   { name: 'Public Gallery', href: '/dashboard/home-page/public-gallery', icon: Image, description: 'Gallery images and homepage showcase marquee (10 aspect ratios)' },
   { name: 'Contact Page', href: '/dashboard/home-page/contact', icon: MessageSquare, description: 'Contact page details and form copy' },
+  { name: 'Login & Signup', href: '/dashboard/home-page/login-signup', icon: LogIn, description: 'Shared images plus login and signup copy on one page' },
   { name: 'FAQs Page', href: '/dashboard/home-page/faqs', icon: HelpCircle, description: 'FAQs page questions and answers' },
   { name: 'About', href: '/dashboard/home-page/about', icon: BookOpen, description: 'About page content and images' },
   { name: 'Vision & Mission', href: '/dashboard/home-page/vision-mission', icon: Target, description: 'Vision & mission page content' },
@@ -23,7 +24,7 @@ export default function HomePageDashboard() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Home Page Content</h1>
         <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Manage public marketing content: blog, home, about, FAQs, contact, vision & mission, tutorials, and security.
+          Manage public marketing content: blog, home, about, FAQs, contact, login & signup, vision & mission, tutorials, and security.
         </p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -375,7 +375,7 @@ export const homepageAPI = {
     method: 'DELETE',
   }),
 
-  // Page content (CMS): home, about, vision_mission, tutorials, security
+  // Page content (CMS): home, about, vision_mission, tutorials, security, faqs, contact, auth
   getPageContent: (slug) => apiRequest(`/api/homepage/content/${slug}/`),
   getPageContentAdmin: (slug) => apiRequest(`/api/homepage/content/${slug}/admin/`),
   updatePageContent: (slug, content) => apiRequest(`/api/homepage/content/${slug}/admin/update/`, {
